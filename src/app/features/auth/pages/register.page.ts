@@ -1,0 +1,144 @@
+import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import { Router, RouterLink } from '@angular/router';
+import { GoogleAuthButtonComponent } from '../components/google-auth-button.component';
+import { AuthService } from '../../../core/services/auth.service';
+
+@Component({
+  selector: 'app-register-page',
+  imports: [RouterLink, GoogleAuthButtonComponent],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: `
+    <section class="auth-page">
+      <div class="ambient-shape ambient-shape-left" aria-hidden="true"></div>
+      <div class="ambient-shape ambient-shape-right" aria-hidden="true"></div>
+      <div class="brand-watermark" aria-hidden="true">Cyphvv</div>
+
+      <div class="auth-card">
+        <h1>Criar conta</h1>
+        <p class="subtitle">
+          O registro e feito apenas com Google para simplificar autenticacao,
+          seguranca e sincronizacao da sua conta.
+        </p>
+
+        <app-google-auth-button
+          label="Cadastrar com Google"
+          (pressed)="registerWithGoogle()"
+        />
+
+        <p class="helper-text">
+          Ja possui conta?
+          <a routerLink="/login">Entrar</a>
+        </p>
+      </div>
+    </section>
+  `,
+  styles: `
+    .auth-page {
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 2rem 1rem;
+      position: relative;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 15% 90%, rgba(102, 169, 255, 0.18), transparent 40%),
+        radial-gradient(circle at 85% 10%, rgba(255, 159, 91, 0.16), transparent 32%),
+        linear-gradient(180deg, #141923 0%, #11151d 100%);
+    }
+
+    .ambient-shape {
+      position: absolute;
+      width: 22rem;
+      height: 22rem;
+      border-radius: 9999px;
+      filter: blur(8px);
+      opacity: 0.35;
+      pointer-events: none;
+    }
+
+    .ambient-shape-left {
+      top: -8rem;
+      left: -6rem;
+      background: #416ca8;
+    }
+
+    .ambient-shape-right {
+      bottom: -9rem;
+      right: -6rem;
+      background: #b56b35;
+    }
+
+    .brand-watermark {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: clamp(3.5rem, 16vw, 11rem);
+      font-weight: 800;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: rgba(102, 169, 255, 0.11);
+      user-select: none;
+      pointer-events: none;
+      white-space: nowrap;
+      z-index: 0;
+    }
+
+    .auth-card {
+      width: min(100%, 28rem);
+      background: rgba(30, 36, 48, 0.9);
+      border: 1px solid var(--color-border-soft);
+      border-radius: var(--radius-lg);
+      padding: 2rem;
+      box-shadow: var(--shadow-lg);
+      z-index: 1;
+      backdrop-filter: blur(4px);
+    }
+
+    h1 {
+      margin: 0.5rem 0 0;
+      font-size: 2rem;
+      color: var(--color-text-primary);
+    }
+
+    .subtitle {
+      margin: 0.75rem 0 1.5rem;
+      color: var(--color-text-secondary);
+      line-height: 1.55;
+    }
+
+    .helper-text {
+      margin: 1.25rem 0 0;
+      color: var(--color-text-secondary);
+      font-size: 0.95rem;
+      text-align: center;
+    }
+
+    .helper-text a {
+      color: var(--color-brand-blue-strong);
+      font-weight: 600;
+      text-decoration: none;
+    }
+
+    .helper-text a:hover {
+      text-decoration: underline;
+    }
+
+    .helper-text a:focus-visible {
+      outline: 2px solid var(--color-focus-ring);
+      outline-offset: 2px;
+      border-radius: 0.25rem;
+    }
+  `,
+})
+export class RegisterPageComponent {
+  private readonly authService = inject(AuthService);
+  private readonly router = inject(Router);
+
+  async registerWithGoogle(): Promise<void> {
+    const isLoggedIn = await this.authService.loginWithGoogle();
+    if (isLoggedIn) {
+      await this.router.navigateByUrl('/mundos');
+    }
+  }
+}
