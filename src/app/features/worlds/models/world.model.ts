@@ -1,6 +1,9 @@
 export interface World {
     id: number;
-    name: string;
-    summary: string;
-    createdAtLabel: string;
+    userId: string;
+    worldName: string;
+    createdAt: string;
+    name?: string;
+    summary?: string;
+    createdAtLabel?: string;
 }

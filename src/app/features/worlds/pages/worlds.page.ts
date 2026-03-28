@@ -39,8 +39,11 @@ import { WorldsStore } from '../data-access/worlds.store';
           </article>
         } @empty {
           <article class="world-card empty">
-            <h2>Nenhum mundo ainda</h2>
-            <p>Clique em "Criar mundo" para iniciar o primeiro.</p>
+            <div class="empty-content">
+              <div class="empty-icon">🌍</div>
+              <h2>Nenhum mundo ainda</h2>
+              <p>Clique em "Criar mundo" para iniciar o primeiro.</p>
+            </div>
           </article>
         }
       </div>
@@ -204,8 +207,41 @@ import { WorldsStore } from '../data-access/worlds.store';
     }
 
     .world-card.empty {
-      padding: 1rem;
+      background: linear-gradient(135deg, rgba(102, 169, 255, 0.08) 0%, rgba(255, 159, 91, 0.08) 100%);
       border-style: dashed;
+      border-color: var(--color-border-soft);
+      min-height: 200px;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .empty-content {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 2rem 1.5rem;
+      width: 100%;
+    }
+
+    .empty-icon {
+      font-size: 3rem;
+      margin-bottom: 1rem;
+      opacity: 0.7;
+    }
+
+    .world-card.empty h2 {
+      margin: 0 0 0.6rem;
+      font-size: 1.2rem;
+      color: var(--color-text-secondary);
+    }
+
+    .world-card.empty p {
+      margin: 0;
+      color: var(--color-text-muted);
+      font-size: 0.95rem;
+      max-width: 32ch;
     }
 
     .dialog-overlay {
