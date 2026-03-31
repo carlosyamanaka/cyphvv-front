@@ -2,6 +2,7 @@ import { FirebaseOptions } from 'firebase/app';
 
 export interface AppEnvironment {
   production: boolean;
+  apiUrl: string;
   firebase: FirebaseOptions;
 }
 
@@ -18,6 +19,7 @@ function runtimeValue(name: string): string {
 
 export const environment: AppEnvironment = {
   production: true,
+  apiUrl: '/api',
   firebase: {
     apiKey: runtimeValue('PROD_FIREBASE_API_KEY'),
     authDomain: runtimeValue('PROD_FIREBASE_AUTH_DOMAIN'),

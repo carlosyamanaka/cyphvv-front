@@ -3,6 +3,25 @@ import { catchError, from, switchMap, throwError } from 'rxjs';
 import { inject } from '@angular/core';
 import { LoggerService } from '../services/logger.service';
 import { AuthService } from '../services/auth.service';
+import { environment } from '../../../environments/environment';
+
+function isInternalApiRequest(url: string): boolean {
+    if (url.startsWith('/')) {
+        return url.startsWith(environment.apiUrl);
+    }
+
+    try {
+        const currentOrigin = globalThis.location?.origin;
+        if (!currentOrigin) {
+            return false;
+        }
+
+        const parsedUrl = new URL(url, currentOrigin);
+        return parsedUrl.origin === currentOrigin && parsedUrl.pathname.startsWith(environment.apiUrl);
+    } catch {
+        return false;
+    }
+}
 
 export const errorInterceptor: HttpInterceptorFn = (req, next) => {
     const logger = inject(LoggerService);
@@ -11,14 +30,14 @@ export const errorInterceptor: HttpInterceptorFn = (req, next) => {
     return from(authService.waitForAuthReady()).pipe(
         switchMap(async () => {
             const user = authService.currentUser();
-            const token = user ? await user.getIdToken() : null;
+            const isInternalApi = isInternalApiRequest(req.url);
+            const token = isInternalApi && user ? await user.getIdToken() : null;
 
             const modifiedReq = req.clone({
                 setHeaders: {
-                    'Content-Type': 'application/json',
                     ...(token ? { Authorization: `Bearer ${token}` } : {}),
                 },
-                withCredentials: true,
+                withCredentials: isInternalApi,
             });
 
             return modifiedReq;

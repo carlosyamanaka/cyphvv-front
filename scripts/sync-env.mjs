@@ -10,14 +10,15 @@ const __dirname = path.dirname(__filename);
 const rootDir = path.resolve(__dirname, '..');
 
 function value(name) {
-    return process.env[name] ?? '';
+  return process.env[name] ?? '';
 }
 
 function environmentFileContent(isProduction, prefix) {
-    return `import { FirebaseOptions } from 'firebase/app';
+  return `import { FirebaseOptions } from 'firebase/app';
 
 export interface AppEnvironment {
   production: boolean;
+  apiUrl: string;
   firebase: FirebaseOptions;
 }
 
@@ -34,6 +35,7 @@ function runtimeValue(name: string): string {
 
 export const environment: AppEnvironment = {
   production: ${isProduction},
+  apiUrl: '/api',
   firebase: {
     apiKey: runtimeValue('${prefix}_FIREBASE_API_KEY'),
     authDomain: runtimeValue('${prefix}_FIREBASE_AUTH_DOMAIN'),
@@ -48,28 +50,28 @@ export const environment: AppEnvironment = {
 }
 
 function runtimeEnvFileContent() {
-    const keys = [
-        'DEV_FIREBASE_API_KEY',
-        'DEV_FIREBASE_AUTH_DOMAIN',
-        'DEV_FIREBASE_PROJECT_ID',
-        'DEV_FIREBASE_STORAGE_BUCKET',
-        'DEV_FIREBASE_MESSAGING_SENDER_ID',
-        'DEV_FIREBASE_APP_ID',
-        'DEV_FIREBASE_MEASUREMENT_ID',
-        'PROD_FIREBASE_API_KEY',
-        'PROD_FIREBASE_AUTH_DOMAIN',
-        'PROD_FIREBASE_PROJECT_ID',
-        'PROD_FIREBASE_STORAGE_BUCKET',
-        'PROD_FIREBASE_MESSAGING_SENDER_ID',
-        'PROD_FIREBASE_APP_ID',
-        'PROD_FIREBASE_MEASUREMENT_ID',
-    ];
+  const keys = [
+    'DEV_FIREBASE_API_KEY',
+    'DEV_FIREBASE_AUTH_DOMAIN',
+    'DEV_FIREBASE_PROJECT_ID',
+    'DEV_FIREBASE_STORAGE_BUCKET',
+    'DEV_FIREBASE_MESSAGING_SENDER_ID',
+    'DEV_FIREBASE_APP_ID',
+    'DEV_FIREBASE_MEASUREMENT_ID',
+    'PROD_FIREBASE_API_KEY',
+    'PROD_FIREBASE_AUTH_DOMAIN',
+    'PROD_FIREBASE_PROJECT_ID',
+    'PROD_FIREBASE_STORAGE_BUCKET',
+    'PROD_FIREBASE_MESSAGING_SENDER_ID',
+    'PROD_FIREBASE_APP_ID',
+    'PROD_FIREBASE_MEASUREMENT_ID',
+  ];
 
-    const content = {
-        __env: Object.fromEntries(keys.map((key) => [key, value(key)])),
-    };
+  const content = {
+    __env: Object.fromEntries(keys.map((key) => [key, value(key)])),
+  };
 
-    return `window.__env = Object.freeze(${JSON.stringify(content.__env, null, 2)});\n`;
+  return `window.__env = Object.freeze(${JSON.stringify(content.__env, null, 2)});\n`;
 }
 
 const developmentFilePath = path.join(rootDir, 'src', 'environments', 'environment.ts');

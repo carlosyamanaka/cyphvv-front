@@ -2,8 +2,8 @@ import { FirebaseOptions } from 'firebase/app';
 
 export interface AppEnvironment {
   production: boolean;
-  firebase: FirebaseOptions;
   apiUrl: string;
+  firebase: FirebaseOptions;
 }
 
 type RuntimeEnv = Record<string, string | undefined>;
