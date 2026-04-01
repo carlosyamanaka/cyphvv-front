@@ -1,10 +1,15 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { map } from 'rxjs';
 import { WorldsStore } from '../data-access/worlds.store';
 import { WorldCard } from '../models/world-card.model';
+
+interface CardPropertyDraft {
+  key: string;
+  value: string;
+}
 
 @Component({
   selector: 'app-world-detail-page',
@@ -28,34 +33,29 @@ import { WorldCard } from '../models/world-card.model';
 
               <section class="sidebar-create" aria-label="Criacao de card">
                 <h2>Novo card</h2>
-                <form [formGroup]="cardForm" (ngSubmit)="submitCard()" novalidate>
-                  <label for="card-title">Titulo</label>
-                  <input
-                    id="card-title"
-                    type="text"
-                    formControlName="title"
-                    maxlength="80"
-                    placeholder="Ex.: Ruinas de Ylvor"
-                  />
+                <form [formGroup]="cardForm" novalidate>
+                  <label for="card-type">Tipo do card</label>
+                  <select
+                    id="card-type"
+                    formControlName="cardTypeId"
+                    [disabled]="isLoadingCardTypes() || isCreatingCardFromType()"
+                    (change)="createCardFromSelectedType()"
+                  >
+                    <option [ngValue]="null">Selecione um tipo</option>
+                    @for (type of cardTypes(); track type.id) {
+                      <option [ngValue]="type.id">{{ type.cardTypeName }}</option>
+                    }
+                  </select>
 
-                  @if (titleControl.invalid && titleControl.touched) {
-                    <p class="field-error">Informe um titulo com pelo menos 2 caracteres.</p>
+                  @if (isLoadingCardTypes()) {
+                    <p class="field-hint">Carregando tipos de card...</p>
                   }
 
-                  <label for="card-description">Conteudo</label>
-                  <textarea
-                    id="card-description"
-                    rows="4"
-                    formControlName="description"
-                    maxlength="500"
-                    placeholder="Escreva o conteudo principal dessa nota."
-                  ></textarea>
-
-                  @if (descriptionControl.invalid && descriptionControl.touched) {
-                    <p class="field-error">Informe uma descricao com pelo menos 4 caracteres.</p>
+                  @if (isCreatingCardFromType()) {
+                    <p class="field-hint">Criando card padrao...</p>
                   }
 
-                  <button type="submit" class="save-button">Criar card</button>
+                  <p class="field-hint">Ao selecionar o tipo, o card e criado automaticamente e aberto no visualizador com conteudo padrao.</p>
                 </form>
               </section>
 
@@ -80,7 +80,7 @@ import { WorldCard } from '../models/world-card.model';
                     <button
                       type="button"
                       class="tree-item"
-                      [class.is-active]="activeCardId() === card.id"
+                      [class.is-active]="isVisibleCard(card.id)"
                       (click)="openCard(card.id)"
                       [attr.aria-label]="'Abrir card ' + card.title"
                     >
@@ -98,43 +98,120 @@ import { WorldCard } from '../models/world-card.model';
               <section class="open-notes-shell">
                 <div class="open-notes-header">
                   <h2>Notas abertas</h2>
-                  <p>Fluxo tipo Obsidian: abra cards na lateral e trabalhe no centro.</p>
                 </div>
 
                 @if (openCards().length) {
-                  <div class="tab-strip" role="tablist" aria-label="Abas de notas abertas">
-                    @for (card of openCards(); track card.id) {
-                      <div class="tab-item" [class.is-active]="activeCardId() === card.id">
-                        <button
-                          type="button"
-                          class="tab-button"
-                          role="tab"
-                          [attr.aria-selected]="activeCardId() === card.id"
-                          (click)="openCard(card.id)"
-                        >
-                          {{ card.title }}
-                        </button>
-                        <button
-                          type="button"
-                          class="tab-close"
-                          (click)="closeCard(card.id)"
-                          [attr.aria-label]="'Fechar nota ' + card.title"
-                        >
-                          x
-                        </button>
-                      </div>
-                    }
-                  </div>
+                  <section
+                    class="note-panels"
+                    [class.note-panels-single]="visibleCards().length === 1"
+                    aria-label="Visualizacao simultanea de cards"
+                  >
+                    @for (selectedCard of visibleCards(); track selectedCard.id) {
+                      <article class="note-panel" role="tabpanel">
+                        <header class="note-header">
+                          <div class="note-header-top">
+                            <div class="note-header-meta">
+                              <p class="note-meta">Atualizado em {{ selectedCard.createdAtLabel }}</p>
+                              <p class="note-type">Tipo: {{ getCardTypeLabel(selectedCard) }}</p>
+                            </div>
+                            <button
+                              type="button"
+                              class="panel-close"
+                              (click)="closeCard(selectedCard.id)"
+                              [attr.aria-label]="'Fechar nota ' + selectedCard.title"
+                            >
+                              x
+                            </button>
+                          </div>
 
-                  @if (activeCard(); as selectedCard) {
-                    <article class="note-panel" role="tabpanel">
-                      <header>
-                        <p class="note-meta">Atualizado em {{ selectedCard.createdAtLabel }}</p>
-                        <h3>{{ selectedCard.title }}</h3>
-                      </header>
-                      <p>{{ selectedCard.description }}</p>
-                    </article>
-                  }
+                          <label [attr.for]="'card-name-' + selectedCard.id">Nome do card</label>
+                          <input
+                            [id]="'card-name-' + selectedCard.id"
+                            type="text"
+                            class="note-title-input"
+                            maxlength="80"
+                            [value]="getTitleDraft(selectedCard)"
+                            (input)="onTitleDraftInput(selectedCard.id, $event)"
+                            (blur)="commitTitle(selectedCard)"
+                          />
+                        </header>
+
+                        <section class="note-section">
+                          <h4>Aliases</h4>
+                          <div class="inline-form">
+                            <input
+                              [id]="'card-alias-' + selectedCard.id"
+                              type="text"
+                              placeholder="Adicionar alias"
+                              [value]="getAliasInput(selectedCard.id)"
+                              (input)="onAliasInput(selectedCard.id, $event)"
+                            />
+                            <button type="button" class="save-button" (click)="addAlias(selectedCard.id)">Adicionar alias</button>
+                          </div>
+
+                          @if (getCardAliases(selectedCard.id).length) {
+                            <div class="alias-list">
+                              @for (alias of getCardAliases(selectedCard.id); track alias) {
+                                <button
+                                  type="button"
+                                  class="alias-chip"
+                                  [attr.aria-label]="'Remover alias ' + alias"
+                                  (click)="removeAlias(selectedCard.id, alias)"
+                                >
+                                  {{ alias }} x
+                                </button>
+                              }
+                            </div>
+                          } @else {
+                            <p class="field-hint">Sem aliases adicionados.</p>
+                          }
+                        </section>
+
+                        <section class="note-section">
+                          <div class="section-head">
+                            <h4>Propriedades</h4>
+                            <button type="button" class="secondary-action" (click)="addProperty(selectedCard.id)">Adicionar propriedade</button>
+                          </div>
+
+                          @if (getCardProperties(selectedCard.id).length) {
+                            <div class="property-list">
+                              @for (property of getCardProperties(selectedCard.id); track $index) {
+                                <div class="property-row">
+                                  <input
+                                    type="text"
+                                    placeholder="Nome"
+                                    [value]="property.key"
+                                    (input)="onPropertyKeyInput(selectedCard.id, $index, $event)"
+                                  />
+                                  <input
+                                    type="text"
+                                    placeholder="Valor"
+                                    [value]="property.value"
+                                    (input)="onPropertyValueInput(selectedCard.id, $index, $event)"
+                                  />
+                                  <button
+                                    type="button"
+                                    class="icon-action"
+                                    aria-label="Remover propriedade"
+                                    (click)="removeProperty(selectedCard.id, $index)"
+                                  >
+                                    x
+                                  </button>
+                                </div>
+                              }
+                            </div>
+                          } @else {
+                            <p class="field-hint">Nenhuma propriedade criada ainda.</p>
+                          }
+                        </section>
+
+                        <section class="note-section">
+                          <h4>Conteudo</h4>
+                          <p>{{ selectedCard.description }}</p>
+                        </section>
+                      </article>
+                    }
+                  </section>
                 } @else {
                   <article class="empty-state">
                     <h3>Nenhuma nota aberta</h3>
@@ -152,6 +229,7 @@ import { WorldCard } from '../models/world-card.model';
         </article>
       }
     </section>
+
   `,
   styles: `
     .vault-page {
@@ -396,64 +474,22 @@ import { WorldCard } from '../models/world-card.model';
       font-size: 0.9rem;
     }
 
-    .tab-strip {
-      display: flex;
-      gap: 0.45rem;
-      overflow: auto;
-      padding-bottom: 0.2rem;
-    }
-
-    .tab-item {
-      display: inline-flex;
-      align-items: center;
-      border: 1px solid var(--color-border-soft);
-      background: #1c2533;
-      border-radius: 0.6rem;
-      overflow: hidden;
-    }
-
-    .tab-item.is-active {
-      border-color: var(--color-brand-blue);
-      box-shadow: inset 0 0 0 1px rgba(102, 169, 255, 0.28);
-      background: #212c3b;
-    }
-
-    .tab-button {
-      border: 0;
-      background: transparent;
-      color: var(--color-text-primary);
-      padding: 0.5rem 0.75rem;
-      cursor: pointer;
-      white-space: nowrap;
-    }
-
-    .tab-button:focus-visible,
-    .tab-close:focus-visible {
-      outline: 2px solid var(--color-focus-ring);
-      outline-offset: -2px;
-    }
-
-    .tab-close {
-      border: 0;
-      border-left: 1px solid var(--color-border-soft);
-      background: transparent;
-      color: var(--color-text-muted);
-      width: 2rem;
-      cursor: pointer;
-      font-size: 0.82rem;
-    }
-
-    .tab-close:hover {
-      color: var(--color-text-primary);
-      background: rgba(255, 255, 255, 0.06);
-    }
-
     .note-panel,
     .empty-state {
       border: 1px solid var(--color-border-soft);
       border-radius: 0.8rem;
       background: linear-gradient(180deg, #1f2735 0%, #1b2230 100%);
       padding: 1rem;
+    }
+
+    .note-panels {
+      display: grid;
+      gap: 0.75rem;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .note-panels.note-panels-single {
+      grid-template-columns: minmax(0, 1fr);
     }
 
     label {
@@ -463,6 +499,7 @@ import { WorldCard } from '../models/world-card.model';
     }
 
     input,
+    select,
     textarea {
       width: 100%;
       border: 1px solid var(--color-border-strong);
@@ -480,9 +517,17 @@ import { WorldCard } from '../models/world-card.model';
     }
 
     input:focus-visible,
+    select:focus-visible,
     textarea:focus-visible {
       outline: 2px solid var(--color-focus-ring);
       outline-offset: 1px;
+    }
+
+    .field-hint {
+      margin: 0;
+      color: var(--color-text-secondary);
+      font-size: 0.85rem;
+      line-height: 1.4;
     }
 
     .save-button {
@@ -513,6 +558,137 @@ import { WorldCard } from '../models/world-card.model';
       margin: 0;
       color: var(--color-text-muted);
       font-size: 0.8rem;
+    }
+
+    .note-header {
+      display: grid;
+      gap: 0.45rem;
+      margin-bottom: 0.85rem;
+    }
+
+    .note-header-top {
+      display: flex;
+      align-items: start;
+      justify-content: space-between;
+      gap: 0.6rem;
+    }
+
+    .note-header-meta {
+      display: grid;
+      gap: 0.35rem;
+    }
+
+    .note-type {
+      color: #ffd8bb;
+      background: rgba(255, 159, 91, 0.16);
+      border: 1px solid rgba(255, 159, 91, 0.36);
+      border-radius: 9999px;
+      padding: 0.2rem 0.6rem;
+      font-size: 0.78rem;
+      font-weight: 700;
+      justify-self: start;
+    }
+
+    .panel-close {
+      border: 1px solid var(--color-border-strong);
+      border-radius: 0.55rem;
+      background: var(--color-bg-elevated);
+      color: var(--color-text-primary);
+      min-width: 2.2rem;
+      min-height: 2.2rem;
+      display: inline-grid;
+      place-items: center;
+      font-size: 1rem;
+      line-height: 1;
+      font-weight: 700;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    .panel-close:hover {
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    .panel-close:focus-visible {
+      outline: 2px solid var(--color-focus-ring);
+      outline-offset: 1px;
+    }
+
+    .note-title-input {
+      font-weight: 700;
+    }
+
+    .note-section {
+      border-top: 1px solid var(--color-border-soft);
+      padding-top: 0.85rem;
+      margin-top: 0.85rem;
+      display: grid;
+      gap: 0.55rem;
+    }
+
+    .note-section h4 {
+      margin: 0;
+      color: var(--color-text-primary);
+      font-size: 0.92rem;
+    }
+
+    .section-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .inline-form {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 0.55rem;
+      align-items: center;
+    }
+
+    .alias-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+
+    .alias-chip,
+    .secondary-action,
+    .icon-action {
+      border: 1px solid var(--color-border-strong);
+      border-radius: 0.55rem;
+      background: var(--color-bg-elevated);
+      color: var(--color-text-primary);
+      cursor: pointer;
+      font-weight: 600;
+    }
+
+    .alias-chip {
+      padding: 0.35rem 0.6rem;
+      font-size: 0.82rem;
+    }
+
+    .secondary-action {
+      padding: 0.45rem 0.65rem;
+      font-size: 0.82rem;
+      white-space: nowrap;
+    }
+
+    .icon-action {
+      width: 2.1rem;
+      height: 2.1rem;
+      font-size: 0.86rem;
+    }
+
+    .property-list {
+      display: grid;
+      gap: 0.5rem;
+    }
+
+    .property-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+      gap: 0.45rem;
+      align-items: center;
     }
 
     .note-panel h3,
@@ -557,6 +733,22 @@ import { WorldCard } from '../models/world-card.model';
         max-height: none;
         overflow: visible;
       }
+
+      .inline-form,
+      .property-row,
+      .section-head {
+        grid-template-columns: 1fr;
+      }
+
+      .note-panels {
+        grid-template-columns: 1fr;
+      }
+
+      .secondary-action,
+      .icon-action,
+      .save-button {
+        justify-self: start;
+      }
     }
   `,
 })
@@ -574,6 +766,14 @@ export class WorldDetailPageComponent {
 
   readonly world = computed(() => this.worldsStore.getWorldById(this.routeWorldId()));
   readonly cards = computed(() => this.worldsStore.getCardsByWorldId(this.routeWorldId()));
+  readonly cardTypes = computed(() => this.worldsStore.getCardTypes().filter((type) => !type.deleted));
+  readonly isLoadingCardTypes = computed(() => this.worldsStore.isLoadingCardTypes());
+  readonly isCreatingCardFromType = signal(false);
+  readonly cardTypeNameByCardId = signal<Record<number, string>>({});
+  readonly titleDraftByCardId = signal<Record<number, string>>({});
+  readonly aliasesByCardId = signal<Record<number, string[]>>({});
+  readonly propertiesByCardId = signal<Record<number, CardPropertyDraft[]>>({});
+  readonly aliasInputByCardId = signal<Record<number, string>>({});
   readonly searchTerm = signal('');
   readonly openCardIds = signal<number[]>([]);
   readonly activeCardId = signal<number | null>(null);
@@ -598,26 +798,228 @@ export class WorldDetailPageComponent {
       .filter((card): card is WorldCard => card !== undefined);
   });
 
-  readonly activeCard = computed(() =>
-    this.openCards().find((card) => card.id === this.activeCardId()) ?? null
-  );
+  readonly visibleCards = computed(() => {
+    const openCards = this.openCards();
+    if (!openCards.length) {
+      return [];
+    }
 
-  readonly cardForm = this.formBuilder.nonNullable.group({
-    title: ['', [Validators.required, Validators.minLength(2)]],
-    description: ['', [Validators.required, Validators.minLength(4)]],
+    const activeId = this.activeCardId();
+    if (activeId === null) {
+      return openCards.slice(0, 2);
+    }
+
+    const cardMap = new Map(openCards.map((card) => [card.id, card]));
+    const orderedIds = [activeId, ...[...this.openCardIds()].reverse().filter((id) => id !== activeId)];
+    const visibleIds = orderedIds.slice(0, 2);
+
+    return visibleIds
+      .map((id) => cardMap.get(id))
+      .filter((card): card is WorldCard => card !== undefined);
   });
 
-  get titleControl() {
-    return this.cardForm.controls.title;
+  readonly cardForm = this.formBuilder.group({
+    cardTypeId: [null as number | null, [Validators.required]],
+  });
+
+  constructor() {
+    effect(() => {
+      const worldId = this.routeWorldId();
+      if (worldId <= 0) {
+        return;
+      }
+
+      this.worldsStore.loadCardsByWorldId(worldId);
+      this.worldsStore.loadCardTypes(worldId);
+    });
+
+    effect(() => {
+      const cards = this.cards();
+      this.cardTypeNameByCardId.update((current) => {
+        let next = current;
+        for (const card of cards) {
+          if (next[card.id] !== undefined) {
+            continue;
+          }
+
+          const parsedType = this.extractTypeFromDescription(card.description);
+          if (parsedType) {
+            next = { ...next, [card.id]: parsedType };
+          }
+        }
+
+        return next;
+      });
+    });
+
+    effect(() => {
+      const cards = this.openCards();
+      for (const card of cards) {
+        this.titleDraftByCardId.update((current) =>
+          current[card.id] !== undefined
+            ? current
+            : { ...current, [card.id]: card.title }
+        );
+
+        this.aliasesByCardId.update((current) =>
+          current[card.id] !== undefined
+            ? current
+            : { ...current, [card.id]: [] }
+        );
+
+        this.propertiesByCardId.update((current) =>
+          current[card.id] !== undefined
+            ? current
+            : { ...current, [card.id]: [] }
+        );
+
+        this.aliasInputByCardId.update((current) =>
+          current[card.id] !== undefined
+            ? current
+            : { ...current, [card.id]: '' }
+        );
+      }
+    });
   }
 
-  get descriptionControl() {
-    return this.cardForm.controls.description;
+  get cardTypeControl() {
+    return this.cardForm.controls.cardTypeId;
   }
 
   onSearchInput(event: Event): void {
     const target = event.target as HTMLInputElement | null;
     this.searchTerm.set(target?.value ?? '');
+  }
+
+  isVisibleCard(cardId: number): boolean {
+    return this.visibleCards().some((card) => card.id === cardId);
+  }
+
+  getCardTypeLabel(card: WorldCard): string {
+    return this.cardTypeNameByCardId()[card.id] ?? this.extractTypeFromDescription(card.description) ?? 'Sem tipo';
+  }
+
+  getTitleDraft(card: WorldCard): string {
+    return this.titleDraftByCardId()[card.id] ?? card.title;
+  }
+
+  onTitleDraftInput(cardId: number, event: Event): void {
+    const target = event.target as HTMLInputElement | null;
+    this.titleDraftByCardId.update((current) => ({
+      ...current,
+      [cardId]: target?.value ?? '',
+    }));
+  }
+
+  commitTitle(card: WorldCard): void {
+    const draft = (this.titleDraftByCardId()[card.id] ?? card.title).trim();
+    if (!draft) {
+      this.titleDraftByCardId.update((current) => ({
+        ...current,
+        [card.id]: card.title,
+      }));
+      return;
+    }
+
+    this.titleDraftByCardId.update((current) => ({
+      ...current,
+      [card.id]: draft,
+    }));
+
+    if (draft === card.title) {
+      return;
+    }
+
+    this.worldsStore.updateCardTitleLocally(this.routeWorldId(), card.id, draft);
+  }
+
+  getAliasInput(cardId: number): string {
+    return this.aliasInputByCardId()[cardId] ?? '';
+  }
+
+  onAliasInput(cardId: number, event: Event): void {
+    const target = event.target as HTMLInputElement | null;
+    this.aliasInputByCardId.update((current) => ({
+      ...current,
+      [cardId]: target?.value ?? '',
+    }));
+  }
+
+  addAlias(cardId: number): void {
+    const alias = this.getAliasInput(cardId).trim();
+    if (!alias) {
+      return;
+    }
+
+    this.aliasesByCardId.update((current) => {
+      const aliases = current[cardId] ?? [];
+      if (aliases.some((item) => item.toLowerCase() === alias.toLowerCase())) {
+        return current;
+      }
+
+      return {
+        ...current,
+        [cardId]: [...aliases, alias],
+      };
+    });
+
+    this.aliasInputByCardId.update((current) => ({
+      ...current,
+      [cardId]: '',
+    }));
+  }
+
+  getCardAliases(cardId: number): string[] {
+    return this.aliasesByCardId()[cardId] ?? [];
+  }
+
+  removeAlias(cardId: number, alias: string): void {
+    this.aliasesByCardId.update((current) => ({
+      ...current,
+      [cardId]: (current[cardId] ?? []).filter((item) => item !== alias),
+    }));
+  }
+
+  getCardProperties(cardId: number): CardPropertyDraft[] {
+    return this.propertiesByCardId()[cardId] ?? [];
+  }
+
+  addProperty(cardId: number): void {
+    this.propertiesByCardId.update((current) => ({
+      ...current,
+      [cardId]: [...(current[cardId] ?? []), { key: '', value: '' }],
+    }));
+  }
+
+  removeProperty(cardId: number, index: number): void {
+    this.propertiesByCardId.update((current) => ({
+      ...current,
+      [cardId]: (current[cardId] ?? []).filter((_, itemIndex) => itemIndex !== index),
+    }));
+  }
+
+  onPropertyKeyInput(cardId: number, index: number, event: Event): void {
+    const target = event.target as HTMLInputElement | null;
+    this.propertiesByCardId.update((current) => ({
+      ...current,
+      [cardId]: (current[cardId] ?? []).map((item, itemIndex) =>
+        itemIndex === index
+          ? { ...item, key: target?.value ?? '' }
+          : item
+      ),
+    }));
+  }
+
+  onPropertyValueInput(cardId: number, index: number, event: Event): void {
+    const target = event.target as HTMLInputElement | null;
+    this.propertiesByCardId.update((current) => ({
+      ...current,
+      [cardId]: (current[cardId] ?? []).map((item, itemIndex) =>
+        itemIndex === index
+          ? { ...item, value: target?.value ?? '' }
+          : item
+      ),
+    }));
   }
 
   openCard(cardId: number): void {
@@ -650,27 +1052,74 @@ export class WorldDetailPageComponent {
     this.activeCardId.set(nextIds[fallbackIndex]);
   }
 
-  submitCard(): void {
-    this.cardForm.markAllAsTouched();
-    if (this.cardForm.invalid || !this.world()) {
+  createCardFromSelectedType(): void {
+    if (this.isCreatingCardFromType()) {
       return;
     }
 
-    const title = this.titleControl.value.trim();
-    const description = this.descriptionControl.value.trim();
-    if (!title || !description) {
+    const selectedTypeId = this.cardTypeControl.value;
+    const selectedType = this.cardTypes().find((type) => type.id === selectedTypeId);
+    if (!selectedType || !this.world()) {
       return;
     }
 
-    this.worldsStore.createCard(this.routeWorldId(), title, description).subscribe({
+    this.isCreatingCardFromType.set(true);
+
+    const timestamp = new Date().toLocaleString('pt-BR');
+    const title = `Novo nome do ${selectedType.cardTypeName}`;
+    const description = [
+      `Tipo: ${selectedType.cardTypeName}`,
+      '',
+      'Resumo inicial:',
+      '- Defina os pontos principais deste card.',
+      '- Adicione detalhes relevantes para o mundo.',
+      '',
+      `Criado em: ${timestamp}`,
+    ].join('\n');
+
+    this.worldsStore.createCard(this.routeWorldId(), title, description, selectedType.id).subscribe({
       next: (createdCard) => {
-        this.cardForm.reset({ title: '', description: '' });
+        this.cardTypeNameByCardId.update((current) => ({
+          ...current,
+          [createdCard.id]: selectedType.cardTypeName,
+        }));
+        this.titleDraftByCardId.update((current) => ({
+          ...current,
+          [createdCard.id]: createdCard.title,
+        }));
+        this.aliasesByCardId.update((current) => ({
+          ...current,
+          [createdCard.id]: [],
+        }));
+        this.propertiesByCardId.update((current) => ({
+          ...current,
+          [createdCard.id]: [],
+        }));
         this.searchTerm.set('');
         this.openCard(createdCard.id);
+        this.cardForm.patchValue({ cardTypeId: null });
+        this.cardTypeControl.markAsUntouched();
+        this.isCreatingCardFromType.set(false);
       },
       error: () => {
-        // Error handling is already managed by the store
+        this.isCreatingCardFromType.set(false);
       },
     });
   }
+
+  private extractTypeFromDescription(description: string): string | null {
+    const firstLine = description.split('\n')[0]?.trim();
+    if (!firstLine) {
+      return null;
+    }
+
+    const normalized = firstLine.toLowerCase();
+    if (!normalized.startsWith('tipo:')) {
+      return null;
+    }
+
+    const typeName = firstLine.slice(firstLine.indexOf(':') + 1).trim();
+    return typeName || null;
+  }
+
 }

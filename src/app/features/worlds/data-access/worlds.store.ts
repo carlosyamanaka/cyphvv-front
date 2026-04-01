@@ -2,6 +2,7 @@ import { Injectable, signal, inject, computed } from '@angular/core';
 import { catchError, tap } from 'rxjs';
 import { World } from '../models/world.model';
 import { WorldCard } from '../models/world-card.model';
+import { CardType } from '../models/card-type.model';
 import { ApiService } from '../../../core/services/api.service';
 
 @Injectable({
@@ -14,6 +15,8 @@ export class WorldsStore {
     readonly isLoading = signal(false);
     readonly error = signal<string | null>(null);
     readonly cardsByWorld = signal<Record<number, WorldCard[]>>({});
+    readonly cardTypes = signal<CardType[]>([]);
+    readonly isLoadingCardTypes = signal(false);
 
     constructor() {
         this.loadWorlds();
@@ -72,22 +75,64 @@ export class WorldsStore {
         });
     }
 
-    createCard(worldId: number, title: string, description: string) {
+    createCard(worldId: number, title: string, description: string, cardTypeId: number) {
+        const tempCardId = -Date.now();
+        const optimisticCard: WorldCard = {
+            id: tempCardId,
+            worldId,
+            title,
+            description,
+            createdAtLabel: this.formatToday(),
+        };
+
+        this.cardsByWorld.update((current) => ({
+            ...current,
+            [worldId]: [optimisticCard, ...(current[worldId] ?? [])],
+        }));
+
         return this.apiService
-            .post<WorldCard>(`/worlds/${worldId}/cards`, { title, description })
+            .post<WorldCard>(`/worlds/${worldId}/cards`, { title, description, cardTypeId })
             .pipe(
                 tap((card) => {
+                    const persistedCard: WorldCard = {
+                        ...card,
+                        title: card.title?.trim() ? card.title : title,
+                        description: card.description?.trim() ? card.description : description,
+                        createdAtLabel: card.createdAtLabel ?? this.formatToday(),
+                    };
+
                     this.cardsByWorld.update((current) => ({
                         ...current,
-                        [worldId]: [card, ...(current[worldId] ?? [])],
+                        [worldId]: (current[worldId] ?? []).map((currentCard) =>
+                            currentCard.id === tempCardId ? persistedCard : currentCard
+                        ),
                     }));
                 }),
                 catchError((error) => {
-                    console.error('Erro ao criar carta:', error);
-                    this.error.set('Erro ao criar carta. Por favor, tente novamente.');
+                    this.cardsByWorld.update((current) => ({
+                        ...current,
+                        [worldId]: (current[worldId] ?? []).filter((card) => card.id !== tempCardId),
+                    }));
+
+                    console.error('Erro ao criar card:', error);
+                    this.error.set('Erro ao criar card. Por favor, tente novamente.');
                     throw error;
                 })
             );
+    }
+
+    updateCardTitleLocally(worldId: number, cardId: number, title: string): void {
+        this.cardsByWorld.update((current) => {
+            const cards = current[worldId] ?? [];
+            return {
+                ...current,
+                [worldId]: cards.map((card) =>
+                    card.id === cardId
+                        ? { ...card, title }
+                        : card
+                ),
+            };
+        });
     }
 
     private formatToday(): string {
@@ -101,6 +146,27 @@ export class WorldsStore {
             summary: '',
             createdAtLabel: this.formatDate(world.createdAt)
         };
+    }
+
+    getCardTypes(): CardType[] {
+        return this.cardTypes();
+    }
+
+    loadCardTypes(worldId: number): void {
+        this.isLoadingCardTypes.set(true);
+        this.error.set(null);
+
+        this.apiService.get<CardType[]>(`/worlds/${worldId}/card-types`).subscribe({
+            next: (cardTypes) => {
+                this.cardTypes.set(cardTypes);
+                this.isLoadingCardTypes.set(false);
+            },
+            error: (error) => {
+                console.error(`Erro ao carregar tipos de card do mundo ${worldId}:`, error);
+                this.error.set('Erro ao carregar tipos de card. Por favor, tente novamente.');
+                this.isLoadingCardTypes.set(false);
+            },
+        });
     }
 
     private formatDate(dateString: string): string {

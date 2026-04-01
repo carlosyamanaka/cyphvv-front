@@ -1,19 +1,17 @@
 import { Component, ChangeDetectionStrategy } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 import { HeaderComponent } from './header.component';
-import { FooterComponent } from './footer.component';
 
 @Component({
   selector: 'app-shell',
   standalone: true,
-  imports: [RouterOutlet, HeaderComponent, FooterComponent],
+  imports: [RouterOutlet, HeaderComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <app-header></app-header>
     <main role="main" class="main-content">
       <router-outlet></router-outlet>
     </main>
-    <app-footer></app-footer>
   `,
   styles: `
     :host {
