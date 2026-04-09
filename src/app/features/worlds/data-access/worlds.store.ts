@@ -169,6 +169,27 @@ export class WorldsStore {
         });
     }
 
+    createCardType(worldId: number, cardTypeName: string) {
+        return this.apiService
+            .post<CardType>(`/worlds/${worldId}/card-types`, { cardTypeName })
+            .pipe(
+                tap((createdType) => {
+                    this.cardTypes.update((current) => {
+                        if (current.some((type) => type.id === createdType.id)) {
+                            return current;
+                        }
+
+                        return [...current, createdType];
+                    });
+                }),
+                catchError((error) => {
+                    console.error('Erro ao criar tipo de card:', error);
+                    this.error.set('Erro ao criar tipo de card. Por favor, tente novamente.');
+                    throw error;
+                })
+            );
+    }
+
     private formatDate(dateString: string): string {
         try {
             const date = new Date(dateString);

@@ -11,6 +11,8 @@ interface CardPropertyDraft {
   value: string;
 }
 
+const CREATE_CARD_TYPE_OPTION_VALUE = '__create_new_card_type__';
+
 @Component({
   selector: 'app-world-detail-page',
   imports: [ReactiveFormsModule, RouterLink],
@@ -35,17 +37,45 @@ interface CardPropertyDraft {
                 <h2>Novo card</h2>
                 <form [formGroup]="cardForm" novalidate>
                   <label for="card-type">Tipo do card</label>
-                  <select
-                    id="card-type"
-                    formControlName="cardTypeId"
-                    [disabled]="isLoadingCardTypes() || isCreatingCardFromType()"
-                    (change)="createCardFromSelectedType()"
-                  >
-                    <option [ngValue]="null">Selecione um tipo</option>
-                    @for (type of cardTypes(); track type.id) {
-                      <option [ngValue]="type.id">{{ type.cardTypeName }}</option>
+                  <div class="card-type-selector">
+                    @if (isCreateTypePopoverOpen()) {
+                      <section class="card-type-popover" aria-label="Criar novo tipo de card">
+                        <p class="field-hint">Novo tipo de card</p>
+                        <input
+                          id="new-card-type"
+                          type="text"
+                          maxlength="60"
+                          placeholder="Ex.: Facção"
+                          [value]="newCardTypeName()"
+                          (input)="onNewCardTypeNameInput($event)"
+                        />
+                        <div class="popover-actions">
+                          <button type="button" class="secondary-action" (click)="cancelCreateCardType()">Cancelar</button>
+                          <button
+                            type="button"
+                            class="save-button"
+                            [disabled]="isCreatingCardType()"
+                            (click)="submitCreateCardType()"
+                          >
+                            Criar tipo
+                          </button>
+                        </div>
+                      </section>
                     }
-                  </select>
+
+                    <select
+                      id="card-type"
+                      formControlName="cardTypeId"
+                      [disabled]="isLoadingCardTypes() || isCreatingCardFromType() || isCreatingCardType()"
+                      (change)="createCardFromSelectedType()"
+                    >
+                      <option [ngValue]="null">Selecione um tipo</option>
+                      @for (type of cardTypes(); track type.id) {
+                        <option [ngValue]="type.id">{{ type.cardTypeName }}</option>
+                      }
+                      <option [ngValue]="createCardTypeOptionValue">+ Criar novo tipo de card</option>
+                    </select>
+                  </div>
 
                   @if (isLoadingCardTypes()) {
                     <p class="field-hint">Carregando tipos de card...</p>
@@ -53,6 +83,10 @@ interface CardPropertyDraft {
 
                   @if (isCreatingCardFromType()) {
                     <p class="field-hint">Criando card padrao...</p>
+                  }
+
+                  @if (isCreatingCardType()) {
+                    <p class="field-hint">Criando novo tipo de card...</p>
                   }
 
                   <p class="field-hint">Ao selecionar o tipo, o card e criado automaticamente e aberto no visualizador com conteudo padrao.</p>
@@ -352,6 +386,32 @@ interface CardPropertyDraft {
     .sidebar-create form {
       margin-top: 0.4rem;
       display: grid;
+      gap: 0.45rem;
+    }
+
+    .card-type-selector {
+      position: relative;
+      display: grid;
+      gap: 0.45rem;
+    }
+
+    .card-type-popover {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: calc(100% + 0.45rem);
+      border: 1px solid var(--color-border-strong);
+      border-radius: 0.65rem;
+      background: #1d2532;
+      box-shadow: var(--shadow-md);
+      padding: 0.7rem;
+      display: grid;
+      gap: 0.55rem;
+    }
+
+    .popover-actions {
+      display: flex;
+      justify-content: end;
       gap: 0.45rem;
     }
 
@@ -769,6 +829,10 @@ export class WorldDetailPageComponent {
   readonly cardTypes = computed(() => this.worldsStore.getCardTypes().filter((type) => !type.deleted));
   readonly isLoadingCardTypes = computed(() => this.worldsStore.isLoadingCardTypes());
   readonly isCreatingCardFromType = signal(false);
+  readonly isCreatingCardType = signal(false);
+  readonly isCreateTypePopoverOpen = signal(false);
+  readonly newCardTypeName = signal('');
+  readonly createCardTypeOptionValue = CREATE_CARD_TYPE_OPTION_VALUE;
   readonly cardTypeNameByCardId = signal<Record<number, string>>({});
   readonly titleDraftByCardId = signal<Record<number, string>>({});
   readonly aliasesByCardId = signal<Record<number, string[]>>({});
@@ -819,7 +883,7 @@ export class WorldDetailPageComponent {
   });
 
   readonly cardForm = this.formBuilder.group({
-    cardTypeId: [null as number | null, [Validators.required]],
+    cardTypeId: [null as number | string | null, [Validators.required]],
   });
 
   constructor() {
@@ -1053,15 +1117,22 @@ export class WorldDetailPageComponent {
   }
 
   createCardFromSelectedType(): void {
-    if (this.isCreatingCardFromType()) {
+    if (this.isCreatingCardFromType() || this.isCreatingCardType()) {
       return;
     }
 
     const selectedTypeId = this.cardTypeControl.value;
+    if (selectedTypeId === CREATE_CARD_TYPE_OPTION_VALUE) {
+      this.openCreateCardTypePopover();
+      return;
+    }
+
     const selectedType = this.cardTypes().find((type) => type.id === selectedTypeId);
     if (!selectedType || !this.world()) {
       return;
     }
+
+    this.isCreateTypePopoverOpen.set(false);
 
     this.isCreatingCardFromType.set(true);
 
@@ -1105,6 +1176,54 @@ export class WorldDetailPageComponent {
         this.isCreatingCardFromType.set(false);
       },
     });
+  }
+
+  onNewCardTypeNameInput(event: Event): void {
+    const target = event.target as HTMLInputElement | null;
+    this.newCardTypeName.set(target?.value ?? '');
+  }
+
+  cancelCreateCardType(): void {
+    this.isCreateTypePopoverOpen.set(false);
+    this.newCardTypeName.set('');
+    this.cardForm.patchValue({ cardTypeId: null });
+  }
+
+  submitCreateCardType(): void {
+    const worldId = this.routeWorldId();
+    if (worldId <= 0) {
+      this.cardForm.patchValue({ cardTypeId: null });
+      return;
+    }
+
+    const cardTypeName = this.newCardTypeName().trim();
+    if (!cardTypeName) {
+      return;
+    }
+
+    if (this.isCreatingCardType()) {
+      return;
+    }
+
+    this.isCreatingCardType.set(true);
+
+    this.worldsStore.createCardType(worldId, cardTypeName).subscribe({
+      next: (createdType) => {
+        this.cardForm.patchValue({ cardTypeId: null });
+        this.isCreateTypePopoverOpen.set(false);
+        this.newCardTypeName.set('');
+        this.isCreatingCardType.set(false);
+      },
+      error: () => {
+        this.cardForm.patchValue({ cardTypeId: null });
+        this.isCreatingCardType.set(false);
+      },
+    });
+  }
+
+  private openCreateCardTypePopover(): void {
+    this.cardForm.patchValue({ cardTypeId: null });
+    this.isCreateTypePopoverOpen.set(true);
   }
 
   private extractTypeFromDescription(description: string): string | null {
