@@ -9,10 +9,6 @@ import { AuthService } from '../../../core/services/auth.service';
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section class="auth-page">
-      <div class="ambient-shape ambient-shape-left" aria-hidden="true"></div>
-      <div class="ambient-shape ambient-shape-right" aria-hidden="true"></div>
-      <div class="brand-watermark" aria-hidden="true">Cyphvv</div>
-
       <div class="auth-card">
         <h1>Entrar</h1>
         <p class="subtitle">
@@ -41,48 +37,10 @@ import { AuthService } from '../../../core/services/auth.service';
       overflow: hidden;
       background-image:
         linear-gradient(to bottom, rgba(20, 25, 35, 0.6) 0%, rgba(17, 21, 29, 0.95) 100%),
-        url('/home_digital_art.jpg');
+        url('/img/home_digital_art.jpg');
       background-size: cover;
       background-position: center;
       background-repeat: no-repeat;
-    }
-
-    .ambient-shape {
-      position: absolute;
-      width: 22rem;
-      height: 22rem;
-      border-radius: 9999px;
-      filter: blur(8px);
-      opacity: 0.35;
-      pointer-events: none;
-    }
-
-    .brand-watermark {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      font-size: clamp(3.5rem, 16vw, 11rem);
-      font-weight: 800;
-      letter-spacing: 0.06em;
-      text-transform: uppercase;
-      color: rgba(102, 169, 255, 0.11);
-      user-select: none;
-      pointer-events: none;
-      white-space: nowrap;
-      z-index: 0;
-    }
-
-    .ambient-shape-left {
-      top: -8rem;
-      left: -6rem;
-      background: #416ca8;
-    }
-
-    .ambient-shape-right {
-      bottom: -9rem;
-      right: -6rem;
-      background: #b56b35;
     }
 
     .auth-card {

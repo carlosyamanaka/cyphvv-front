@@ -9,30 +9,21 @@ import { WorldsStore } from '../data-access/worlds.store';
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section class="worlds-page">
-      <header class="hero">
-        <div>
-          <p class="eyebrow">Seus Mundos</p>
-          <h1>Construa novos universos</h1>
-          <p>
-            Gerencie seus cenarios, faccoes e historias em um so lugar.
-          </p>
-        </div>
+      <main class="worlds-panel">
+        <p class="eyebrow">Seus mundos</p>
+        <h1>Mundos</h1>
+        <p class="panel-subtitle">Escolha um mundo para continuar.</p>
 
-        <button type="button" class="create-button" (click)="openCreateWorldDialog()">
-          Criar mundo
-        </button>
-      </header>
-
-      <div class="world-grid">
+        <div class="world-list">
         @for (world of worlds(); track world.id) {
-          <article class="world-card">
+            <article class="world-card">
             <button
               type="button"
               class="world-button"
               (click)="openWorld(world.id)"
               [attr.aria-label]="'Abrir mundo ' + world.name"
             >
-              <p class="world-date">Criado em {{ world.createdAtLabel }}</p>
+                <p class="world-date">Atualizado {{ world.createdAtLabel }}</p>
               <h2>{{ world.name }}</h2>
               <p>{{ world.summary }}</p>
             </button>
@@ -40,13 +31,17 @@ import { WorldsStore } from '../data-access/worlds.store';
         } @empty {
           <article class="world-card empty">
             <div class="empty-content">
-              <div class="empty-icon">🌍</div>
-              <h2>Nenhum mundo ainda</h2>
-              <p>Clique em "Criar mundo" para iniciar o primeiro.</p>
+                <h2>Nenhum mundo ainda</h2>
+                <p>Clique em "Criar novo mundo" para iniciar o primeiro.</p>
             </div>
           </article>
         }
-      </div>
+        </div>
+
+        <button type="button" class="create-button create-world-main" (click)="openCreateWorldDialog()">
+          Criar novo mundo
+        </button>
+      </main>
 
       @if (isCreateDialogOpen()) {
         <div class="dialog-overlay" (click)="closeCreateWorldDialog()" aria-hidden="true"></div>
@@ -80,85 +75,130 @@ import { WorldsStore } from '../data-access/worlds.store';
     </section>
   `,
   styles: `
-    .worlds-page {
-      max-width: 1100px;
-      margin: 0 auto;
-      padding: 2rem 1rem 1rem;
+    :host {
+      display: block;
+      height: 100%;
     }
 
-    .hero {
-      display: flex;
-      align-items: end;
-      justify-content: space-between;
-      gap: 1rem;
-      margin-bottom: 1.5rem;
-      padding: 1.5rem;
-      border-radius: var(--radius-lg);
-      border: 1px solid var(--color-border-soft);
+    .worlds-page {
+      position: relative;
+      width: 100vw;
+      margin-inline: calc(50% - 50vw);
+      height: calc(100dvh - 4rem);
+      min-height: calc(100dvh - 4rem);
+      box-sizing: border-box;
+      overflow: hidden;
+      display: grid;
+      place-items: center;
+      padding: 1rem clamp(1rem, 3vw, 2rem);
+      isolation: isolate;
+      background-image: url('/img/city_purple.jpg');
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+    }
+
+    .worlds-page::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: inherit;
+      background-size: cover;
+      background-position: center;
+      filter: blur(3px) brightness(0.68);
+      z-index: -2;
+    }
+
+    .worlds-page::after {
+      content: '';
+      position: absolute;
+      inset: 0;
       background:
-        radial-gradient(circle at 0% 50%, rgba(102, 169, 255, 0.12), transparent 42%),
-        radial-gradient(circle at 100% 10%, rgba(255, 159, 91, 0.16), transparent 30%),
-        linear-gradient(125deg, #232b39 0%, #2c2530 100%);
-      box-shadow: var(--shadow-sm);
+        radial-gradient(circle at 50% 22%, rgba(112, 101, 193, 0.16) 0%, transparent 58%),
+        linear-gradient(to bottom, rgba(6, 8, 20, 0.2), rgba(7, 9, 18, 0.58));
+      z-index: -1;
+    }
+
+    .worlds-panel {
+      width: min(100%, 34rem);
+      height: min(100%, 38rem);
+      display: grid;
+      grid-template-rows: auto auto auto 1fr auto;
+      gap: 0.7rem;
+      padding: 1rem;
+      border-radius: var(--radius-lg);
+      border: 1px solid rgba(158, 171, 219, 0.24);
+      background: linear-gradient(170deg, rgba(10, 14, 27, 0.62) 0%, rgba(7, 11, 24, 0.84) 100%);
+      box-shadow: 0 20px 44px rgba(2, 4, 12, 0.42);
+      backdrop-filter: blur(5px);
+      box-sizing: border-box;
     }
 
     .eyebrow {
       margin: 0;
-      font-size: 0.8rem;
+      font-size: 0.72rem;
       text-transform: uppercase;
       letter-spacing: 0.08em;
       font-weight: 700;
-      color: var(--color-brand-blue);
+      color: #bac6f2;
     }
 
     h1 {
-      margin: 0.45rem 0 0;
-      color: var(--color-text-primary);
-      font-size: clamp(1.6rem, 4vw, 2rem);
+      margin: 0;
+      color: #ecf0ff;
+      font-size: 1.2rem;
+      font-weight: 700;
     }
 
-    .hero p {
-      margin: 0.6rem 0 0;
-      color: var(--color-text-secondary);
-      max-width: 42ch;
-      line-height: 1.5;
+    .panel-subtitle {
+      margin: 0;
+      color: rgba(221, 230, 255, 0.75);
+      font-size: 0.85rem;
     }
 
     .create-button {
       border: 0;
       border-radius: var(--radius-pill);
-      background: linear-gradient(135deg, var(--color-brand-blue) 0%, var(--color-brand-blue-strong) 100%);
-      color: #fff;
-      padding: 0.85rem 1.3rem;
+      background: linear-gradient(135deg, #8f9bed 0%, #7687df 100%);
+      color: #111731;
+      padding: 0.7rem 1rem;
+      font-size: 0.9rem;
       font-weight: 700;
       cursor: pointer;
       transition: transform 0.15s ease, box-shadow 0.15s ease;
-      white-space: nowrap;
     }
 
     .create-button:hover {
       transform: translateY(-1px);
-      box-shadow: var(--shadow-md);
+      box-shadow: 0 10px 22px rgba(93, 110, 217, 0.4);
     }
 
     .create-button:focus-visible {
-      outline: 2px solid var(--color-focus-ring);
+      outline: 2px solid #c6d2ff;
       outline-offset: 2px;
     }
 
-    .world-grid {
+    .create-world-main {
+      margin-top: 0.25rem;
+      width: 100%;
+    }
+
+    .world-list {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-      gap: 1rem;
+      gap: 0.5rem;
+      min-height: 0;
+      max-height: none;
+      overflow: hidden;
+      padding-right: 0.35rem;
     }
 
     .world-card {
-      background: var(--color-bg-elevated);
-      border: 1px solid var(--color-border-soft);
-      border-radius: var(--radius-md);
-      box-shadow: var(--shadow-sm);
+      border: 1px solid rgba(145, 158, 212, 0.2);
+      border-radius: 0.8rem;
+      background: rgba(7, 12, 24, 0.5);
       display: flex;
       overflow: hidden;
+      min-width: 0;
     }
 
     .world-button {
@@ -168,49 +208,51 @@ import { WorldsStore } from '../data-access/worlds.store';
       display: flex;
       flex-direction: column;
       border: 0;
-      border-radius: var(--radius-md);
+      border-radius: 0.8rem;
       background: transparent;
       text-align: left;
-      padding: 1rem;
+      padding: 0.8rem;
+      gap: 0.12rem;
       cursor: pointer;
       transition: transform 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+      min-width: 0;
     }
 
     .world-button:hover {
-      transform: translateY(-2px);
-      background:
-        linear-gradient(160deg, #2d3646 0%, #312a24 100%);
-      box-shadow: inset 0 0 0 1px rgba(102, 169, 255, 0.24);
+      background: linear-gradient(140deg, rgba(58, 67, 122, 0.32), rgba(34, 48, 84, 0.22));
+      box-shadow: inset 0 0 0 1px rgba(169, 185, 255, 0.3);
     }
 
     .world-button:focus-visible {
-      outline: 2px solid var(--color-focus-ring);
+      outline: 2px solid #c6d2ff;
       outline-offset: 2px;
     }
 
     .world-date {
       margin: 0;
-      color: var(--color-text-muted);
-      font-size: 0.8rem;
+      color: rgba(202, 213, 251, 0.76);
+      font-size: 0.72rem;
     }
 
-    h2 {
-      margin: 0.6rem 0 0.4rem;
-      color: var(--color-text-primary);
-      font-size: 1.1rem;
+    .world-button h2 {
+      margin: 0.4rem 0 0.3rem;
+      color: #edf1ff;
+      font-size: 0.98rem;
+      overflow-wrap: anywhere;
     }
 
-    .world-card p {
+    .world-button p {
       margin: 0;
-      color: var(--color-text-secondary);
-      line-height: 1.45;
+      color: rgba(220, 227, 255, 0.76);
+      line-height: 1.35;
+      font-size: 0.82rem;
+      overflow-wrap: anywhere;
     }
 
     .world-card.empty {
-      background: linear-gradient(135deg, rgba(102, 169, 255, 0.08) 0%, rgba(255, 159, 91, 0.08) 100%);
-      border-style: dashed;
-      border-color: var(--color-border-soft);
-      min-height: 200px;
+      background: rgba(7, 12, 24, 0.44);
+      border-style: solid;
+      min-height: 6.2rem;
       align-items: center;
       justify-content: center;
     }
@@ -221,34 +263,28 @@ import { WorldsStore } from '../data-access/worlds.store';
       align-items: center;
       justify-content: center;
       text-align: center;
-      padding: 2rem 1.5rem;
+      padding: 1.15rem 0.9rem;
       width: 100%;
     }
 
-    .empty-icon {
-      font-size: 3rem;
-      margin-bottom: 1rem;
-      opacity: 0.7;
-    }
-
     .world-card.empty h2 {
-      margin: 0 0 0.6rem;
-      font-size: 1.2rem;
-      color: var(--color-text-secondary);
+      margin: 0 0 0.35rem;
+      font-size: 0.92rem;
+      color: #e4eaff;
     }
 
     .world-card.empty p {
       margin: 0;
-      color: var(--color-text-muted);
-      font-size: 0.95rem;
+      color: rgba(204, 216, 255, 0.75);
+      font-size: 0.8rem;
       max-width: 32ch;
     }
 
     .dialog-overlay {
       position: fixed;
       inset: 0;
-      background: rgba(7, 10, 16, 0.62);
-      backdrop-filter: blur(2px);
+      background: rgba(5, 8, 17, 0.55);
+      backdrop-filter: blur(3px);
       z-index: 20;
     }
 
@@ -258,8 +294,8 @@ import { WorldsStore } from '../data-access/worlds.store';
       left: 50%;
       transform: translate(-50%, -50%);
       width: min(92vw, 28rem);
-      background: var(--color-bg-elevated);
-      border: 1px solid var(--color-border-soft);
+      background: linear-gradient(165deg, #121831 0%, #0b1329 100%);
+      border: 1px solid rgba(162, 176, 235, 0.22);
       border-radius: var(--radius-lg);
       box-shadow: var(--shadow-lg);
       padding: 1.2rem;
@@ -269,11 +305,12 @@ import { WorldsStore } from '../data-access/worlds.store';
     .dialog h2 {
       margin: 0;
       font-size: 1.3rem;
+      color: #edf1ff;
     }
 
     .dialog p {
       margin: 0.5rem 0 0;
-      color: var(--color-text-secondary);
+      color: rgba(221, 231, 255, 0.78);
     }
 
     form {
@@ -284,20 +321,21 @@ import { WorldsStore } from '../data-access/worlds.store';
 
     label {
       font-weight: 600;
-      color: var(--color-text-primary);
+      color: #edf1ff;
     }
 
     input {
       width: 100%;
-      border: 1px solid var(--color-border-strong);
+      border: 1px solid rgba(157, 172, 229, 0.4);
       border-radius: var(--radius-sm);
       padding: 0.7rem 0.8rem;
       font-size: 1rem;
-      color: var(--color-text-primary);
+      background: rgba(10, 15, 31, 0.85);
+      color: #edf1ff;
     }
 
     input:focus-visible {
-      outline: 2px solid var(--color-focus-ring);
+      outline: 2px solid #c6d2ff;
       outline-offset: 1px;
     }
 
@@ -315,24 +353,17 @@ import { WorldsStore } from '../data-access/worlds.store';
     }
 
     .secondary-button {
-      border: 1px solid var(--color-border-strong);
+      border: 1px solid rgba(157, 172, 229, 0.45);
       border-radius: var(--radius-pill);
-      background: var(--color-bg-surface);
-      color: var(--color-text-primary);
+      background: rgba(11, 17, 36, 0.9);
+      color: #edf1ff;
       padding: 0.75rem 1.1rem;
       font-weight: 600;
       cursor: pointer;
     }
 
     .secondary-button:hover {
-      border-color: var(--color-brand-orange);
-    }
-
-    @media (max-width: 760px) {
-      .hero {
-        flex-direction: column;
-        align-items: start;
-      }
+      border-color: #b4c2ff;
     }
   `,
 })
