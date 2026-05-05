@@ -1,7 +1,7 @@
 export interface WorldCard {
     id: number;
     worldId: number;
-    title: string;
+    cardName: string;
     description: string;
     createdAtLabel: string;
 }

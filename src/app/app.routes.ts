@@ -3,6 +3,11 @@ import { authGuard } from './core/guards/auth.guard';
 
 export const routes: Routes = [
     {
+        path: '',
+        pathMatch: 'full',
+        redirectTo: 'login',
+    },
+    {
         path: 'login',
         loadComponent: () =>
             import('./features/auth/pages/login.page').then(
@@ -21,11 +26,6 @@ export const routes: Routes = [
         loadComponent: () =>
             import('./layout/app-shell.component').then((m) => m.AppShellComponent),
         children: [
-            {
-                path: '',
-                pathMatch: 'full',
-                redirectTo: 'login',
-            },
             {
                 path: 'mundos',
                 canActivate: [authGuard],

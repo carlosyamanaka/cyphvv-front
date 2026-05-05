@@ -66,7 +66,7 @@ export class WorldsStore {
             next: (cards) => {
                 this.cardsByWorld.update((current) => ({
                     ...current,
-                    [worldId]: cards,
+                    [worldId]: cards.map((card) => this.normalizeCard(card)),
                 }));
             },
             error: (error) => {
@@ -75,12 +75,13 @@ export class WorldsStore {
         });
     }
 
-    createCard(worldId: number, title: string, description: string, cardTypeId: number) {
+    createCard(worldId: number, cardName: string, description: string, cardTypeId: number) {
         const tempCardId = -Date.now();
+        const normalizedCardName = cardName?.trim() ? cardName.trim() : 'Card do tipo (Sem tipo)';
         const optimisticCard: WorldCard = {
             id: tempCardId,
             worldId,
-            title,
+            cardName: normalizedCardName,
             description,
             createdAtLabel: this.formatToday(),
         };
@@ -91,15 +92,15 @@ export class WorldsStore {
         }));
 
         return this.apiService
-            .post<WorldCard>(`/worlds/${worldId}/cards`, { title, description, cardTypeId })
+            .post<WorldCard>(`/worlds/${worldId}/cards`, { cardName: normalizedCardName, description, cardTypeId })
             .pipe(
                 tap((card) => {
-                    const persistedCard: WorldCard = {
-                        ...card,
-                        title: card.title?.trim() ? card.title : title,
-                        description: card.description?.trim() ? card.description : description,
-                        createdAtLabel: card.createdAtLabel ?? this.formatToday(),
-                    };
+                    const persistedCard = this.normalizeCard(card, {
+                        worldId,
+                        cardName: normalizedCardName,
+                        description,
+                        createdAtLabel: this.formatToday(),
+                    });
 
                     this.cardsByWorld.update((current) => ({
                         ...current,
@@ -121,18 +122,30 @@ export class WorldsStore {
             );
     }
 
-    updateCardTitleLocally(worldId: number, cardId: number, title: string): void {
+    updateCardNameLocally(worldId: number, cardId: number, cardName: string): void {
         this.cardsByWorld.update((current) => {
             const cards = current[worldId] ?? [];
             return {
                 ...current,
                 [worldId]: cards.map((card) =>
                     card.id === cardId
-                        ? { ...card, title }
+                        ? { ...card, cardName }
                         : card
                 ),
             };
         });
+    }
+
+    private normalizeCard(card: WorldCard, fallback?: Partial<WorldCard>): WorldCard {
+        const rawName = card.cardName?.trim() || fallback?.cardName?.trim() || 'Sem nome';
+
+        return {
+            ...fallback,
+            ...card,
+            cardName: rawName,
+            description: card.description?.trim() ? card.description : (fallback?.description ?? ''),
+            createdAtLabel: card.createdAtLabel ?? fallback?.createdAtLabel ?? this.formatToday(),
+        };
     }
 
     private formatToday(): string {

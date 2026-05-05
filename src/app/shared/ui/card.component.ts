@@ -9,15 +9,14 @@ import { Component, ChangeDetectionStrategy } from '@angular/core';
     :host {
       display: block;
       background: var(--color-bg-elevated);
-      border: 1px solid var(--color-border-soft);
       border-radius: var(--radius-md);
       padding: 1.5rem;
-      box-shadow: var(--shadow-sm);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
       transition: box-shadow 0.2s, transform 0.2s;
       
       &:hover {
-        box-shadow: var(--shadow-md);
-        transform: translateY(-1px);
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.16);
+        transform: translateY(-2px);
       }
     }
   `,
