@@ -39,10 +39,12 @@ import { AuthService } from '../../../core/services/auth.service';
       padding: 2rem 1rem;
       position: relative;
       overflow: hidden;
-      background:
-        radial-gradient(circle at 16% 12%, rgba(102, 169, 255, 0.2), transparent 42%),
-        radial-gradient(circle at 86% 10%, rgba(255, 159, 91, 0.18), transparent 36%),
-        linear-gradient(180deg, #141923 0%, #11151d 100%);
+      background-image:
+        linear-gradient(to bottom, rgba(20, 25, 35, 0.6) 0%, rgba(17, 21, 29, 0.95) 100%),
+        url('/home_digital_art.jpg');
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
     }
 
     .ambient-shape {
