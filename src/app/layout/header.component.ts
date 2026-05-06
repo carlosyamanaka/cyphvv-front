@@ -14,7 +14,7 @@ import { AuthService } from '../core/services/auth.service';
         <nav class="nav">
           <a href="/" class="logo" (click)="onLogoClick($event)">
             <img
-              ngSrc="/cyphvv-logo.svg"
+              ngSrc="/icons/cyphvv-logo.svg"
               width="36"
               height="36"
               alt=""

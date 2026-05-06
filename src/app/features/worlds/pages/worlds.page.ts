@@ -11,7 +11,6 @@ import { WorldsStore } from '../data-access/worlds.store';
     <section class="worlds-page">
       <main class="worlds-panel">
         <p class="eyebrow">Seus mundos</p>
-        <h1>Mundos</h1>
         <p class="panel-subtitle">Escolha um mundo para continuar.</p>
 
         <div class="world-list">
@@ -84,8 +83,8 @@ import { WorldsStore } from '../data-access/worlds.store';
       position: relative;
       width: 100vw;
       margin-inline: calc(50% - 50vw);
-      height: calc(100dvh - 4rem);
-      min-height: calc(100dvh - 4rem);
+      height: calc(100dvh - 4rem - 1px);
+      min-height: calc(100dvh - 4rem - 1px);
       box-sizing: border-box;
       overflow: hidden;
       display: grid;
@@ -123,8 +122,8 @@ import { WorldsStore } from '../data-access/worlds.store';
       width: min(100%, 34rem);
       height: min(100%, 38rem);
       display: grid;
-      grid-template-rows: auto auto auto 1fr auto;
-      gap: 0.7rem;
+      grid-template-rows: auto auto 1fr auto;
+      gap: 0.8rem;
       padding: 1rem;
       border-radius: var(--radius-lg);
       border: 1px solid rgba(158, 171, 219, 0.24);
@@ -136,18 +135,11 @@ import { WorldsStore } from '../data-access/worlds.store';
 
     .eyebrow {
       margin: 0;
-      font-size: 0.72rem;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      font-weight: 700;
-      color: #bac6f2;
-    }
-
-    h1 {
-      margin: 0;
-      color: #ecf0ff;
       font-size: 1.2rem;
+      text-transform: none;
+      letter-spacing: normal;
       font-weight: 700;
+      color: #ecf0ff;
     }
 
     .panel-subtitle {
@@ -185,10 +177,14 @@ import { WorldsStore } from '../data-access/worlds.store';
 
     .world-list {
       display: grid;
-      gap: 0.5rem;
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
+      gap: 0.65rem;
       min-height: 0;
-      max-height: none;
-      overflow: hidden;
+      align-content: start;
+      grid-auto-rows: minmax(0, auto);
+      grid-auto-flow: row dense;
+      overflow-y: auto;
+      overflow-x: hidden;
       padding-right: 0.35rem;
     }
 
@@ -238,7 +234,13 @@ import { WorldsStore } from '../data-access/worlds.store';
       margin: 0.4rem 0 0.3rem;
       color: #edf1ff;
       font-size: 0.98rem;
+      line-height: 1.25;
       overflow-wrap: anywhere;
+      word-break: break-word;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
     }
 
     .world-button p {
@@ -247,9 +249,15 @@ import { WorldsStore } from '../data-access/worlds.store';
       line-height: 1.35;
       font-size: 0.82rem;
       overflow-wrap: anywhere;
+      word-break: break-word;
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
     }
 
     .world-card.empty {
+      grid-column: 1 / -1;
       background: rgba(7, 12, 24, 0.44);
       border-style: solid;
       min-height: 6.2rem;
