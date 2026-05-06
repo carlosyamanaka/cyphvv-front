@@ -1,0 +1,35 @@
+<svg width="120" height="120" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <g stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+
+        <!-- Pergaminho topo -->
+        <path d="M30 25c0-8 10-12 20-12s20 4 20 12" />
+
+        <!-- Pergaminho corpo -->
+        <rect x="30" y="25" width="60" height="70" rx="10" ry="10" fill="none" />
+
+        <!-- Pergaminho base -->
+        <path d="M30 95c0 8 10 12 20 12s20-4 20-12" />
+
+        <!-- Enroladinhos laterais -->
+        <path d="M30 25c-8 0-10 10-5 15" />
+        <path d="M90 25c8 0 10 10 5 15" />
+        <path d="M30 95c-8 0-10-10-5-15" />
+        <path d="M90 95c8 0 10-10 5-15" />
+
+        <!-- Olhos -->
+        <circle cx="50" cy="55" r="2" fill="black" />
+        <circle cx="70" cy="55" r="2" fill="black" />
+
+        <!-- Boca (confusa/triste leve) -->
+        <path d="M48 70c4-3 8-3 12 0" />
+
+        <!-- Linhas vazias -->
+        <path d="M45 80h30" stroke-dasharray="3 3" />
+        <path d="M45 88h20" stroke-dasharray="3 3" />
+
+        <!-- Estrelinhas mágicas -->
+        <path d="M20 40l2 2-2 2-2-2 2-2z" />
+        <path d="M100 60l2 2-2 2-2-2 2-2z" />
+
+    </g>
+</svg>

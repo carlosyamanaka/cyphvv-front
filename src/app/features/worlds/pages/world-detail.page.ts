@@ -20,13 +20,9 @@ const CREATE_CARD_TYPE_OPTION_VALUE = '__create_new_card_type__';
   template: `
     <section class="vault-page">
       @if (world(); as selectedWorld) {
-        <header class="vault-topbar">
-          <a class="back-link" routerLink="/mundos">Voltar para mundos</a>
-          <p class="vault-pill">Vault ativo</p>
-        </header>
-
         <div class="vault-shell">
           <aside class="vault-sidebar">
+              <a class="back-link sidebar-back-link" routerLink="/mundos">Voltar para mundos</a>
               <section class="sidebar-world">
                 <p class="sidebar-label">Mundo</p>
                 <h1>{{ selectedWorld.name }}</h1>
@@ -106,7 +102,6 @@ const CREATE_CARD_TYPE_OPTION_VALUE = '__create_new_card_type__';
                   <span>{{ filteredCards().length }}</span>
                 </div>
 
-                <label class="search-label" for="card-search">Pesquisar</label>
                 <input
                   id="card-search"
                   type="search"
@@ -254,8 +249,17 @@ const CREATE_CARD_TYPE_OPTION_VALUE = '__create_new_card_type__';
                   </section>
                 } @else {
                   <article class="empty-state">
-                    <h3>Nenhuma nota aberta</h3>
-                    <p>Abra um card pela barra da esquerda para visualizar no centro.</p>
+                    <div class="empty-icon" aria-hidden="true">
+                      <img
+                        class="empty-icon-img"
+                        src="/icons/no-notes.svg"
+                        alt=""
+                        width="320"
+                        height="320"
+                        decoding="async"
+                      />
+                    </div>
+                    <p class="empty-state-text">Nenhuma nota aberta</p>
                   </article>
                 }
               </section>
@@ -273,31 +277,59 @@ const CREATE_CARD_TYPE_OPTION_VALUE = '__create_new_card_type__';
   `,
   styles: `
     .vault-page {
-      max-width: 1120px;
-      margin: 0 auto;
-      padding: 1.25rem 1rem 2rem;
+      position: relative;
+      isolation: isolate;
+      width: 100vw;
+      max-width: none;
+      margin-left: calc(50% - 50vw);
+      padding: 0.1rem;
       display: grid;
-      gap: 0.9rem;
+      gap: 0.5rem;
+      overflow: hidden;
+      min-height: calc(100vh - 4.5rem);
+      font-size: 0.98rem;
     }
 
-    .vault-topbar {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 0.8rem;
-      border-radius: 0.8rem;
+    .vault-page::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      z-index: -2;
       background:
-        linear-gradient(130deg, #1d2533 0%, #2a2128 100%);
-      padding: 0.55rem 0.75rem;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.16);
+        linear-gradient(160deg, rgba(8, 9, 13, 0.78) 0%, rgba(12, 13, 18, 0.84) 55%, rgba(7, 8, 12, 0.9) 100%),
+        url('/img/tower.jpg') center / cover no-repeat;
+      transform: scale(1.05);
+      filter: blur(8px) saturate(0.95);
+    }
+
+    .vault-page::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      z-index: -1;
+      background: radial-gradient(circle at 32% 20%, rgba(181, 92, 43, 0.14) 0%, rgba(12, 14, 21, 0.12) 35%, rgba(9, 10, 16, 0.62) 100%);
+      pointer-events: none;
     }
 
     .back-link,
     .back-home-link {
-      color: var(--color-brand-blue);
+      color: #e7e4de;
       text-decoration: none;
       font-weight: 600;
-      font-size: 0.92rem;
+      font-size: 0.72rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.2rem;
+      opacity: 0.88;
+      padding: 0.12rem 0.22rem;
+      border-radius: 0.35rem;
+      line-height: 1.1;
+    }
+
+    .sidebar-back-link {
+      justify-self: start;
+      margin: 0 0 0.15rem;
+      opacity: 0.78;
     }
 
     .back-link:hover,
@@ -305,37 +337,29 @@ const CREATE_CARD_TYPE_OPTION_VALUE = '__create_new_card_type__';
       text-decoration: underline;
     }
 
-    .vault-pill {
-      margin: 0;
-      color: #ffd8bb;
-      background: rgba(255, 159, 91, 0.16);
-      border: 1px solid rgba(255, 159, 91, 0.36);
-      border-radius: 9999px;
-      padding: 0.25rem 0.65rem;
-      font-size: 0.75rem;
-      letter-spacing: 0.04em;
-      text-transform: uppercase;
-      font-weight: 700;
-    }
-
     .vault-shell {
-      min-height: 70vh;
+      margin: 0.2rem auto 0;
+      width: min(100%, 1320px);
+      min-height: auto;
       border-radius: 1rem;
       overflow: hidden;
-      background: linear-gradient(180deg, #161c26 0%, #141922 100%);
+      background: rgba(7, 8, 13, 0.36);
       display: grid;
-      grid-template-columns: minmax(290px, 340px) minmax(0, 1fr);
-      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+      grid-template-columns: 250px minmax(0, 1fr);
+      border: 1px solid rgba(255, 255, 255, 0.09);
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.34);
+      backdrop-filter: blur(12px);
     }
 
     .vault-sidebar {
-      background: linear-gradient(180deg, #1a212d 0%, #171d28 100%);
-      padding: 1rem;
+      background: linear-gradient(180deg, rgba(9, 10, 15, 0.72) 0%, rgba(11, 12, 18, 0.74) 100%);
+      padding: 0.6rem;
       display: grid;
       align-content: start;
-      gap: 0.9rem;
-      max-height: calc(100vh - 11.5rem);
-      overflow: auto;
+      gap: 0.75rem;
+      max-height: none;
+      overflow: visible;
+      border-right: 1px solid rgba(255, 255, 255, 0.08);
     }
 
     .sidebar-world,
@@ -343,10 +367,11 @@ const CREATE_CARD_TYPE_OPTION_VALUE = '__create_new_card_type__';
     .notes-tree,
     .open-notes-shell,
     .not-found {
-      border-radius: 0.9rem;
-      background: var(--color-bg-surface);
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.16);
-      padding: 0.9rem;
+      border-radius: 0.7rem;
+      background: rgba(20, 20, 24, 0.68);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.22);
+      padding: 0.65rem;
     }
 
     .sidebar-label {
@@ -354,22 +379,26 @@ const CREATE_CARD_TYPE_OPTION_VALUE = '__create_new_card_type__';
       color: var(--color-text-muted);
       text-transform: uppercase;
       letter-spacing: 0.08em;
-      font-size: 0.72rem;
+      font-size: 0.66rem;
       font-weight: 700;
     }
 
     .vault-sidebar h1 {
       margin: 0;
       color: var(--color-text-primary);
-      font-size: clamp(1.3rem, 3.8vw, 1.8rem);
+      font-size: clamp(0.95rem, 2vw, 1.15rem);
       line-height: 1.2;
+      white-space: normal;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+      hyphens: auto;
     }
 
     .sidebar-summary {
       margin: 0;
       color: var(--color-text-secondary);
       line-height: 1.45;
-      font-size: 0.94rem;
+      font-size: 0.78rem;
     }
 
     .sidebar-create {
@@ -382,7 +411,7 @@ const CREATE_CARD_TYPE_OPTION_VALUE = '__create_new_card_type__';
     .open-notes-header h2 {
       margin: 0;
       color: var(--color-text-primary);
-      font-size: 1rem;
+      font-size: 0.82rem;
     }
 
     .sidebar-create form {
@@ -420,7 +449,7 @@ const CREATE_CARD_TYPE_OPTION_VALUE = '__create_new_card_type__';
     .notes-tree {
       display: grid;
       gap: 0.55rem;
-      background: linear-gradient(160deg, #1f2734 0%, #24202b 100%);
+      background: linear-gradient(160deg, rgba(31, 39, 52, 0.9) 0%, rgba(36, 32, 43, 0.9) 100%);
       min-height: 17rem;
     }
 
@@ -445,17 +474,19 @@ const CREATE_CARD_TYPE_OPTION_VALUE = '__create_new_card_type__';
 
     .search-label {
       color: var(--color-text-secondary);
-      font-size: 0.82rem;
+      font-size: 0.72rem;
       font-weight: 600;
     }
 
     .search-input {
       width: 100%;
-      border-radius: 0.5rem;
-      background: var(--color-bg-surface);
-      padding: 0.55rem 0.7rem;
+      border-radius: 0.45rem;
+      background: rgba(50, 50, 58, 0.44);
+      padding: 0.28rem 0.52rem;
+      font-size: 0.8rem;
+      min-height: 1.85rem;
       color: var(--color-text-primary);
-      box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.12);
+      box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.18);
       border: none;
     }
 
@@ -472,9 +503,9 @@ const CREATE_CARD_TYPE_OPTION_VALUE = '__create_new_card_type__';
     }
 
     .tree-item {
-      border-radius: 0.6rem;
-      background: var(--color-bg-elevated);
-      padding: 0.55rem;
+      border-radius: 0.5rem;
+      background: rgba(28, 29, 35, 0.8);
+      padding: 0.45rem 0.5rem;
       text-align: left;
       cursor: pointer;
       transition: transform 0.15s ease, box-shadow 0.15s ease;
@@ -500,14 +531,14 @@ const CREATE_CARD_TYPE_OPTION_VALUE = '__create_new_card_type__';
     .tree-item-title {
       margin: 0;
       color: var(--color-text-primary);
-      font-size: 0.9rem;
+      font-size: 0.78rem;
       font-weight: 600;
     }
 
     .tree-item-date {
       margin: 0.2rem 0 0;
       color: var(--color-text-muted);
-      font-size: 0.75rem;
+      font-size: 0.68rem;
     }
 
     .tree-empty {
@@ -518,20 +549,26 @@ const CREATE_CARD_TYPE_OPTION_VALUE = '__create_new_card_type__';
     }
 
     .vault-editor {
-      padding: 1rem;
+      padding: 0.8rem 1.2rem;
       display: grid;
       gap: 0.9rem;
       align-content: start;
-      background: linear-gradient(180deg, #161d29 0%, #141922 100%);
-      max-height: calc(100vh - 11.5rem);
-      overflow: auto;
+      justify-items: center;
+      background: linear-gradient(180deg, rgba(12, 14, 21, 0.4) 0%, rgba(10, 12, 19, 0.42) 100%);
+      max-height: none;
+      overflow: visible;
     }
 
     .open-notes-shell {
+      width: min(100%, 1020px);
+      margin: 0 auto;
       min-height: 100%;
       display: grid;
       align-content: start;
       gap: 0.75rem;
+      border-radius: 0.9rem;
+      background: rgba(10, 11, 17, 0.56);
+      backdrop-filter: blur(8px);
     }
 
     .open-notes-header p {
@@ -542,16 +579,58 @@ const CREATE_CARD_TYPE_OPTION_VALUE = '__create_new_card_type__';
 
     .note-panel,
     .empty-state {
-      border-radius: 0.8rem;
-      background: linear-gradient(180deg, #1f2735 0%, #1b2230 100%);
-      padding: 1rem;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.16);
+      border-radius: 0.72rem;
+      background: linear-gradient(180deg, rgba(20, 22, 30, 0.88) 0%, rgba(15, 17, 24, 0.9) 100%);
+      border: 1px solid rgba(255, 255, 255, 0.09);
+      padding: 0.85rem;
+      box-shadow: 0 8px 18px rgba(0, 0, 0, 0.24);
+      min-height: 320px;
+    }
+
+    .empty-state {
+      display: grid;
+      place-items: center;
+      align-content: center;
+      justify-items: center;
+      gap: 0.35rem;
+      padding: 1.2rem;
+    }
+
+    .empty-icon {
+      width: min(320px, 85%);
+      aspect-ratio: 1 / 1;
+      display: grid;
+      place-items: center;
+      background: transparent;
+      border: none;
+      box-shadow: none;
+      border-radius: 0;
+    }
+
+    .empty-icon-img {
+      width: 72%;
+      height: 72%;
+      object-fit: contain;
+      filter: none;
+      opacity: 0.92;
+    }
+
+    .empty-state-text {
+      margin: 0;
+      text-align: center;
+      color: var(--color-text-secondary);
+      font-size: 0.86rem;
+      font-weight: 600;
+      letter-spacing: 0.01em;
+      white-space: normal;
+      line-height: 1.35;
     }
 
     .note-panels {
       display: grid;
       gap: 0.75rem;
       grid-template-columns: repeat(2, minmax(0, 1fr));
+      align-items: start;
     }
 
     .note-panels.note-panels-single {
@@ -561,21 +640,21 @@ const CREATE_CARD_TYPE_OPTION_VALUE = '__create_new_card_type__';
     label {
       font-weight: 600;
       color: var(--color-text-primary);
-      font-size: 0.92rem;
+      font-size: 0.8rem;
     }
 
     input,
     select,
     textarea {
       width: 100%;
-      border-radius: 0.55rem;
-      background: var(--color-bg-surface);
-      padding: 0.7rem 0.8rem;
-      font-size: 1rem;
+      border-radius: 0.5rem;
+      background: rgba(50, 50, 58, 0.56);
+      padding: 0.52rem 0.62rem;
+      font-size: 0.84rem;
       color: var(--color-text-primary);
       resize: vertical;
       border: none;
-      box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.12);
+      box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2);
     }
 
     input::placeholder,
@@ -593,17 +672,17 @@ const CREATE_CARD_TYPE_OPTION_VALUE = '__create_new_card_type__';
     .field-hint {
       margin: 0;
       color: var(--color-text-muted);
-      font-size: 0.75rem;
+      font-size: 0.68rem;
       line-height: 1.4;
     }
 
     .save-button {
       margin-top: 0.35rem;
       border: 0;
-      border-radius: 0.6rem;
+      border-radius: 0.5rem;
       background: linear-gradient(135deg, var(--color-brand-blue) 0%, var(--color-brand-blue-strong) 100%);
       color: #ffffff;
-      padding: 0.72rem 1rem;
+      padding: 0.55rem 0.78rem;
       font-weight: 700;
       cursor: pointer;
       justify-self: start;
@@ -650,21 +729,21 @@ const CREATE_CARD_TYPE_OPTION_VALUE = '__create_new_card_type__';
       background: rgba(255, 159, 91, 0.16);
       border: 1px solid rgba(255, 159, 91, 0.36);
       border-radius: 9999px;
-      padding: 0.2rem 0.6rem;
-      font-size: 0.78rem;
+      padding: 0.16rem 0.48rem;
+      font-size: 0.66rem;
       font-weight: 700;
       justify-self: start;
     }
 
     .panel-close {
-      border-radius: 0.55rem;
-      background: var(--color-bg-elevated);
+      border-radius: 0.46rem;
+      background: rgba(45, 45, 54, 0.8);
       color: var(--color-text-primary);
-      min-width: 2.2rem;
-      min-height: 2.2rem;
+      min-width: 1.8rem;
+      min-height: 1.8rem;
       display: inline-grid;
       place-items: center;
-      font-size: 1rem;
+      font-size: 0.86rem;
       line-height: 1;
       font-weight: 700;
       cursor: pointer;
@@ -688,8 +767,8 @@ const CREATE_CARD_TYPE_OPTION_VALUE = '__create_new_card_type__';
 
     .note-section {
       border-top: 1px solid var(--color-border-soft);
-      padding-top: 0.85rem;
-      margin-top: 0.85rem;
+      padding-top: 0.7rem;
+      margin-top: 0.7rem;
       display: grid;
       gap: 0.55rem;
     }
@@ -697,7 +776,7 @@ const CREATE_CARD_TYPE_OPTION_VALUE = '__create_new_card_type__';
     .note-section h4 {
       margin: 0;
       color: var(--color-text-primary);
-      font-size: 0.92rem;
+      font-size: 0.82rem;
     }
 
     .section-head {
@@ -732,23 +811,23 @@ const CREATE_CARD_TYPE_OPTION_VALUE = '__create_new_card_type__';
     }
 
     .alias-chip {
-      padding: 0.35rem 0.6rem;
-      font-size: 0.82rem;
+      padding: 0.26rem 0.46rem;
+      font-size: 0.72rem;
     }
 
     .secondary-action {
-      padding: 0.45rem 0.65rem;
-      font-size: 0.82rem;
+      padding: 0.36rem 0.52rem;
+      font-size: 0.72rem;
       white-space: nowrap;
     }
 
     .primary-action {
-      border-radius: 0.65rem;
+      border-radius: 0.52rem;
       border: none;
       background: linear-gradient(135deg, var(--color-brand-blue) 0%, var(--color-brand-blue-strong) 100%);
       color: #ffffff;
-      padding: 0.75rem 0.95rem;
-      font-size: 0.92rem;
+      padding: 0.58rem 0.72rem;
+      font-size: 0.8rem;
       font-weight: 700;
       cursor: pointer;
       box-shadow: 0 4px 14px rgba(102, 169, 255, 0.22);
@@ -770,9 +849,9 @@ const CREATE_CARD_TYPE_OPTION_VALUE = '__create_new_card_type__';
     }
 
     .icon-action {
-      width: 2.1rem;
-      height: 2.1rem;
-      font-size: 0.86rem;
+      width: 1.8rem;
+      height: 1.8rem;
+      font-size: 0.76rem;
     }
 
     .property-list {
@@ -791,14 +870,15 @@ const CREATE_CARD_TYPE_OPTION_VALUE = '__create_new_card_type__';
     .empty-state h3 {
       margin: 0.45rem 0;
       color: var(--color-text-primary);
-      font-size: 1.2rem;
+      font-size: 1.02rem;
     }
 
     .note-panel p,
-    .empty-state p {
+    .empty-state p:not(.empty-state-text) {
       margin: 0;
       color: var(--color-text-secondary);
-      line-height: 1.6;
+      line-height: 1.5;
+      font-size: 0.82rem;
       white-space: pre-wrap;
     }
 

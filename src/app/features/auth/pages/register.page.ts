@@ -38,7 +38,7 @@ import { AuthService } from '../../../core/services/auth.service';
       overflow: hidden;
       background-image:
         linear-gradient(to bottom, rgba(20, 25, 35, 0.6) 0%, rgba(17, 21, 29, 0.95) 100%),
-        url('/home_digital_art.jpg');
+        url('/img/home_digital_art.jpg');
       background-size: cover;
       background-position: center;
       background-repeat: no-repeat;

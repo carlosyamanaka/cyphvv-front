@@ -8,7 +8,7 @@ import { NgOptimizedImage } from '@angular/common';
   template: `
     <button type="button" class="google-button" (click)="pressed.emit()">
       <img
-        ngSrc="/google-icon.svg"
+        ngSrc="/icons/google-icon.svg"
         width="20"
         height="20"
         alt=""

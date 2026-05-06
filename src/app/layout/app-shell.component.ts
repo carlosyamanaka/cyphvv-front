@@ -22,6 +22,7 @@ import { HeaderComponent } from './header.component';
     
     .main-content {
       flex: 1;
+      min-height: 0;
       width: min(100%, 1220px);
       margin: 0 auto;
       padding: 0 0.25rem;
