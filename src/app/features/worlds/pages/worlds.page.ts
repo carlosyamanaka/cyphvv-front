@@ -66,7 +66,13 @@ import { WorldsStore } from '../data-access/worlds.store';
               <button type="button" class="secondary-button" (click)="closeCreateWorldDialog()">
                 Cancelar
               </button>
-              <button type="submit" class="create-button">Salvar mundo</button>
+              <button type="submit" class="create-button" [disabled]="isCreatingWorld()">
+                @if (isCreatingWorld()) {
+                  Criando...
+                } @else {
+                  Salvar mundo
+                }
+              </button>
             </div>
           </form>
         </section>
@@ -160,9 +166,17 @@ import { WorldsStore } from '../data-access/worlds.store';
       transition: transform 0.15s ease, box-shadow 0.15s ease;
     }
 
-    .create-button:hover {
+    .create-button:hover:not(:disabled) {
       transform: translateY(-1px);
       box-shadow: 0 10px 22px rgba(93, 110, 217, 0.4);
+    }
+
+    .create-button:disabled {
+      background: linear-gradient(135deg, #4b527a 0%, #3e4875 100%);
+      color: #8c98ca;
+      cursor: not-allowed;
+      box-shadow: none;
+      transform: none;
     }
 
     .create-button:focus-visible {
@@ -382,6 +396,7 @@ export class WorldsPageComponent {
 
   readonly worlds = this.worldsStore.worlds;
   readonly isCreateDialogOpen = signal(false);
+  readonly isCreatingWorld = signal(false);
   readonly createWorldForm = this.formBuilder.nonNullable.group({
     worldName: ['', [Validators.required, Validators.minLength(2)]],
   });
@@ -411,8 +426,17 @@ export class WorldsPageComponent {
       return;
     }
 
-    this.worldsStore.createWorld(worldName);
-    this.closeCreateWorldDialog();
+    this.isCreatingWorld.set(true);
+    this.worldsStore.createWorld(worldName).subscribe({
+      next: (world) => {
+        this.isCreatingWorld.set(false);
+        this.closeCreateWorldDialog();
+        this.openWorld(world.id);
+      },
+      error: () => {
+        this.isCreatingWorld.set(false);
+      }
+    });
   }
 
   openWorld(worldId: number): void {

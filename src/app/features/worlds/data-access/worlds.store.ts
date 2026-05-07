@@ -40,17 +40,18 @@ export class WorldsStore {
         });
     }
 
-    createWorld(worldName: string): void {
-        this.apiService.post<World>('/worlds', { worldName, summary: '' }).subscribe({
-            next: (world) => {
+    createWorld(worldName: string) {
+        return this.apiService.post<World>('/worlds', { worldName, summary: '' }).pipe(
+            tap((world) => {
                 const formattedWorld = this.formatWorldData(world);
                 this.worlds.update((currentWorlds) => [formattedWorld, ...currentWorlds]);
-            },
-            error: (error) => {
+            }),
+            catchError((error) => {
                 console.error('Erro ao criar mundo:', error);
                 this.error.set('Erro ao criar mundo. Por favor, tente novamente.');
-            },
-        });
+                throw error;
+            })
+        );
     }
 
     getWorldById(worldId: number): World | undefined {
@@ -182,9 +183,9 @@ export class WorldsStore {
         });
     }
 
-    createCardType(worldId: number, cardTypeName: string) {
+    createCardType(worldId: number, cardTypeName: string, iconType: string) {
         return this.apiService
-            .post<CardType>(`/worlds/${worldId}/card-types`, { cardTypeName })
+            .post<CardType>(`/worlds/${worldId}/card-types`, { cardTypeName, iconType })
             .pipe(
                 tap((createdType) => {
                     this.cardTypes.update((current) => {
