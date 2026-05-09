@@ -2,9 +2,16 @@ import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } 
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { map } from 'rxjs';
+import { map, Subject, debounceTime, tap } from 'rxjs';
+import { LucideAngularModule, Ghost, ScrollText, User, Calendar, Shield, Map as MapIcon, Users, Eye, Crosshair, Star, MapPin, Crown, BookOpen, Sun, Book, FileQuestion, AlignLeft, Type } from 'lucide-angular';
 import { WorldsStore } from '../data-access/worlds.store';
 import { WorldCard } from '../models/world-card.model';
+
+export interface CardSection {
+  id?: number;
+  type: string;
+  content: string;
+}
 
 interface CardPropertyDraft {
   key: string;
@@ -15,7 +22,7 @@ const CREATE_CARD_TYPE_OPTION_VALUE = '__create_new_card_type__';
 
 @Component({
   selector: 'app-world-detail-page',
-  imports: [ReactiveFormsModule, RouterLink],
+  imports: [ReactiveFormsModule, RouterLink, LucideAngularModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section class="vault-page">
@@ -57,8 +64,11 @@ const CREATE_CARD_TYPE_OPTION_VALUE = '__create_new_card_type__';
                       <p class="tree-item-date">{{ card.createdAtLabel }}</p>
                     </button>
                   } @empty {
-                    <p class="tree-empty">Nenhum card encontrado para esse filtro.</p>
-                  }
+                <div class="tree-empty-state">
+                  <lucide-icon [img]="GhostIcon" [size]="32" class="tree-empty-icon" strokeWidth="1.5"></lucide-icon>
+                  <p class="tree-empty-text">Nenhuma nota por aqui ainda...</p>
+                </div>
+              }
                 </div>
               </section>
 
@@ -69,7 +79,7 @@ const CREATE_CARD_TYPE_OPTION_VALUE = '__create_new_card_type__';
                   [disabled]="isLoadingCardTypes() || isCreatingCardFromType() || !cardTypes().length"
                   (click)="openNewCardModal()"
                 >
-                  + Novo cartao
+                  + Novo Cartão
                 </button>
                 @if (isLoadingCardTypes()) {
                   <p class="field-hint">Carregando tipos de card...</p>
@@ -105,7 +115,7 @@ const CREATE_CARD_TYPE_OPTION_VALUE = '__create_new_card_type__';
                               />
                               <div class="note-meta-actions">
                                 <span class="note-type-inline">
-                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                                  <lucide-icon [img]="getCardIcon(selectedCard)" [size]="14" strokeWidth="2.5"></lucide-icon>
                                   {{ getCardTypeLabel(selectedCard) }}
                                 </span>
                                 <button
@@ -131,7 +141,7 @@ const CREATE_CARD_TYPE_OPTION_VALUE = '__create_new_card_type__';
                                     <button class="remove-alias" (click)="removeAlias(selectedCard.id, alias)">x</button>
                                   </div>
                                 }
-                                <div class="add-alias-inline-wrapper">
+                                <div class="alias-input-wrapper">
                                   <input
                                     type="text"
                                     class="discreet-input"
@@ -139,12 +149,8 @@ const CREATE_CARD_TYPE_OPTION_VALUE = '__create_new_card_type__';
                                     [value]="getAliasInput(selectedCard.id)"
                                     (input)="onAliasInput(selectedCard.id, $event)"
                                     (keyup.enter)="addAlias(selectedCard.id)"
+                                    (blur)="addAlias(selectedCard.id)"
                                   />
-                                  @if (getAliasInput(selectedCard.id).trim()) {
-                                    <button type="button" class="discreet-button" (click)="addAlias(selectedCard.id)">
-                                      + Salvar
-                                    </button>
-                                  }
                                 </div>
                               </div>
                             </section>
@@ -184,15 +190,62 @@ const CREATE_CARD_TYPE_OPTION_VALUE = '__create_new_card_type__';
                               }
                             </section>
 
-                            <section class="note-section">
-                              <h4>Conteudo</h4>
-                              <p>{{ selectedCard.description }}</p>
+                            <section class="note-sections">
+                              @for (section of getCardSections(selectedCard.id); track $index) {
+                                <div class="card-section">
+                                  <div class="section-header">
+                                    <div class="section-type-label">
+                                      @if (section.type === 'description') {
+                                        <lucide-icon [img]="AlignLeftIcon" [size]="14" strokeWidth="2.5"></lucide-icon>
+                                        <span>Descrição</span>
+                                      } @else {
+                                        <lucide-icon [img]="TypeIcon" [size]="14" strokeWidth="2.5"></lucide-icon>
+                                        <span>Texto</span>
+                                      }
+                                    </div>
+                                    <button
+                                      type="button"
+                                      class="icon-action"
+                                      aria-label="Remover seção"
+                                      (click)="removeSection(selectedCard.id, $index)"
+                                    >
+                                      x
+                                    </button>
+                                  </div>
+                                  <textarea
+                                    class="section-textarea"
+                                    [value]="section.content"
+                                    (input)="onSectionContentInput(selectedCard.id, $index, $event)"
+                                    (blur)="saveSections(selectedCard.id)"
+                                    placeholder="Escreva algo..."
+                                  ></textarea>
+                                </div>
+                              }
+
+                              <div class="add-section-actions">
+                                <button type="button" class="discreet-add-btn" (click)="addSection(selectedCard.id, 'description')">
+                                  <lucide-icon [img]="AlignLeftIcon" [size]="14" strokeWidth="2.5"></lucide-icon>
+                                  Descrição
+                                </button>
+                                <button type="button" class="discreet-add-btn" (click)="addSection(selectedCard.id, 'text')">
+                                  <lucide-icon [img]="TypeIcon" [size]="14" strokeWidth="2.5"></lucide-icon>
+                                  Texto
+                                </button>
+                                @if (isSavingSections()[selectedCard.id]) {
+                                  <span class="saving-indicator">Salvando...</span>
+                                }
+                              </div>
                             </section>
                           </div>
 
                           <div class="note-panel-image-col">
-                            <div class="image-placeholder-box">
-                              <button class="add-image-btn">+</button>
+                            <div class="card-image-box">
+                              <img 
+                                [src]="selectedCard.imageUrl || '/img/dummy.jpg'" 
+                                [alt]="selectedCard.cardName"
+                                class="card-image"
+                              />
+                              <button class="add-image-btn" aria-label="Adicionar imagem">+</button>
                             </div>
                           </div>
                         </div>
@@ -201,17 +254,13 @@ const CREATE_CARD_TYPE_OPTION_VALUE = '__create_new_card_type__';
                   </section>
                 } @else {
                   <article class="empty-state">
-                    <div class="empty-icon" aria-hidden="true">
-                      <img
-                        class="empty-icon-img"
-                        src="/icons/no-notes.svg"
-                        alt=""
-                        width="320"
-                        height="320"
-                        decoding="async"
-                      />
+                    <div class="empty-illustration-icon">
+                      <lucide-icon [img]="ScrollTextIcon" [size]="80" strokeWidth="1"></lucide-icon>
                     </div>
-                    <p class="empty-state-text">Nenhuma nota aberta</p>
+                    <div class="empty-text-content">
+                      <h3 class="empty-title">Nenhum card aberto</h3>
+                      <p class="empty-subtitle">Selecione um card na barra lateral ou crie um novo para comecar.</p>
+                    </div>
                   </article>
                 }
               </section>
@@ -252,6 +301,7 @@ const CREATE_CARD_TYPE_OPTION_VALUE = '__create_new_card_type__';
                   [disabled]="isCreatingCardFromType()"
                   (click)="createCardFromType(type.id)"
                 >
+                  <lucide-icon [img]="getIcon(type.iconType)" [size]="16" strokeWidth="2"></lucide-icon>
                   {{ type.cardTypeName }}
                 </button>
               } @empty {
@@ -597,11 +647,24 @@ const CREATE_CARD_TYPE_OPTION_VALUE = '__create_new_card_type__';
       font-size: 0.68rem;
     }
 
-    .tree-empty {
+    .tree-empty-state {
+      display: grid;
+      place-items: center;
+      gap: 0.5rem;
+      padding: 2rem 1rem;
+      opacity: 0.5;
+    }
+
+    .tree-empty-icon {
+      color: var(--color-text-muted);
+    }
+
+    .tree-empty-text {
       margin: 0;
       color: var(--color-text-secondary);
-      font-size: 0.86rem;
+      font-size: 0.8rem;
       line-height: 1.4;
+      text-align: center;
     }
 
     .vault-editor {
@@ -638,38 +701,38 @@ const CREATE_CARD_TYPE_OPTION_VALUE = '__create_new_card_type__';
       place-items: center;
       align-content: center;
       justify-items: center;
-      gap: 0.35rem;
-      padding: 1.2rem;
+      padding: 4rem 1.2rem;
     }
 
-    .empty-icon {
-      width: min(320px, 85%);
-      aspect-ratio: 1 / 1;
-      display: grid;
-      place-items: center;
-      background: transparent;
-      border: none;
-      box-shadow: none;
-      border-radius: 0;
+    .empty-illustration-icon {
+      color: rgba(145, 158, 212, 0.2);
+      margin-bottom: 1.5rem;
+      animation: floatIcon 6s ease-in-out infinite;
     }
 
-    .empty-icon-img {
-      width: 72%;
-      height: 72%;
-      object-fit: contain;
-      filter: none;
-      opacity: 0.92;
+    @keyframes floatIcon {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-8px); }
     }
 
-    .empty-state-text {
-      margin: 0;
+    .empty-text-content {
       text-align: center;
+      display: grid;
+      gap: 0.5rem;
+    }
+
+    .empty-title {
+      margin: 0;
+      color: var(--color-text-primary);
+      font-size: 1.35rem;
+      font-weight: 700;
+    }
+
+    .empty-subtitle {
+      margin: 0;
       color: var(--color-text-secondary);
-      font-size: 0.86rem;
-      font-weight: 600;
-      letter-spacing: 0.01em;
-      white-space: normal;
-      line-height: 1.35;
+      font-size: 0.95rem;
+      max-width: 400px;
     }
 
     .note-panels {
@@ -922,32 +985,54 @@ const CREATE_CARD_TYPE_OPTION_VALUE = '__create_new_card_type__';
       flex-shrink: 0;
     }
 
-    .image-placeholder-box {
+    .card-image-box {
+      position: relative;
       width: 100%;
       aspect-ratio: 3/4;
       background: rgba(255, 255, 255, 0.02);
-      border-radius: 0.6rem;
+      border-radius: 0.8rem;
       border: 1px solid rgba(255, 255, 255, 0.08);
-      display: grid;
-      place-items: center;
+      overflow: hidden;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
     }
 
+    .card-image {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+
     .add-image-btn {
-      background: rgba(255, 255, 255, 0.05);
-      border: none;
+      position: absolute;
+      bottom: 0.75rem;
+      right: 0.75rem;
+      background: rgba(15, 20, 30, 0.75);
+      backdrop-filter: blur(4px);
+      border: 1px solid rgba(255, 255, 255, 0.15);
       border-radius: 50%;
-      width: 2rem;
-      height: 2rem;
-      color: var(--color-text-secondary);
-      font-size: 1.2rem;
+      width: 2.2rem;
+      height: 2.2rem;
+      color: #ffffff;
+      font-size: 1.3rem;
       line-height: 1;
       cursor: pointer;
       display: grid;
       place-items: center;
+      transition: all 0.2s ease;
+      opacity: 0;
+      transform: translateY(4px);
     }
+
+    .card-image-box:hover .add-image-btn {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
     .add-image-btn:hover {
-      background: rgba(255, 255, 255, 0.1);
-      color: var(--color-text-primary);
+      background: var(--color-brand-blue);
+      border-color: transparent;
     }
     .secondary-action,
     .icon-action {
@@ -1063,6 +1148,9 @@ const CREATE_CARD_TYPE_OPTION_VALUE = '__create_new_card_type__';
       font-size: 0.82rem;
       font-weight: 600;
       cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
       transition: background 0.15s ease;
     }
 
@@ -1078,7 +1166,7 @@ const CREATE_CARD_TYPE_OPTION_VALUE = '__create_new_card_type__';
     .new-card-type-option.add-new-type {
       border: 1px dashed rgba(255, 255, 255, 0.18);
       background: rgba(255, 255, 255, 0.02);
-      text-align: center;
+      justify-content: center;
       color: var(--color-text-secondary);
     }
 
@@ -1118,6 +1206,87 @@ const CREATE_CARD_TYPE_OPTION_VALUE = '__create_new_card_type__';
       line-height: 1.5;
       font-size: 0.82rem;
       white-space: pre-wrap;
+    }
+
+    .note-sections {
+      display: grid;
+      gap: 1.2rem;
+      margin-top: 1rem;
+    }
+
+    .card-section {
+      display: grid;
+      gap: 0.4rem;
+    }
+
+    .section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .section-type-label {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      color: var(--color-text-muted);
+      font-size: 0.68rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .section-textarea {
+      width: 100%;
+      background: transparent;
+      border: none;
+      color: var(--color-text-primary);
+      font-size: 0.9rem;
+      line-height: 1.6;
+      resize: none;
+      min-height: 2.5rem;
+      padding: 0;
+      font-family: inherit;
+    }
+
+    .section-textarea:focus {
+      outline: none;
+    }
+
+    .add-section-actions {
+      display: flex;
+      gap: 0.6rem;
+      margin-top: 0.5rem;
+      align-items: center;
+    }
+
+    .saving-indicator {
+      font-size: 0.75rem;
+      color: var(--color-text-muted);
+      margin-left: auto;
+      font-style: italic;
+    }
+
+    .discreet-add-btn {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 0.5rem;
+      padding: 0.35rem 0.6rem;
+      color: var(--color-text-secondary);
+      font-size: 0.72rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .discreet-add-btn:hover {
+      background: rgba(255, 255, 255, 0.06);
+      border-color: rgba(255, 255, 255, 0.15);
+      color: var(--color-text-primary);
+      transform: translateY(-1px);
     }
 
     .not-found h1 {
@@ -1180,6 +1349,40 @@ const CREATE_CARD_TYPE_OPTION_VALUE = '__create_new_card_type__';
 export class WorldDetailPageComponent {
   private readonly route = inject(ActivatedRoute);
   private readonly formBuilder = inject(FormBuilder);
+  readonly ScrollTextIcon = ScrollText;
+  readonly GhostIcon = Ghost;
+  readonly AlignLeftIcon = AlignLeft;
+  readonly TypeIcon = Type;
+
+  private readonly iconMap: Record<string, any> = {
+    'user': User,
+    'calendar': Calendar,
+    'shield': Shield,
+    'map': MapIcon,
+    'users': Users,
+    'eye': Eye,
+    'crosshair': Crosshair,
+    'star': Star,
+    'map-pin': MapPin,
+    'crown': Crown,
+    'book-open': BookOpen,
+    'sun': Sun,
+    'book': Book,
+    'ghost': Ghost,
+    'scroll-text': ScrollText
+  };
+
+  getIcon(iconName: string | undefined): any {
+    if (!iconName) return FileQuestion;
+    return this.iconMap[iconName] || FileQuestion;
+  }
+
+  getCardIcon(card: WorldCard): any {
+    const typeLabel = this.getCardTypeLabel(card);
+    const type = this.cardTypes().find((t) => t.cardTypeName.toLowerCase() === typeLabel.toLowerCase());
+    return this.getIcon(type?.iconType);
+  }
+
   private readonly worldsStore = inject(WorldsStore);
 
   private readonly routeWorldId = toSignal(
@@ -1204,6 +1407,9 @@ export class WorldDetailPageComponent {
   readonly cardNameDraftByCardId = signal<Record<number, string>>({});
   readonly aliasesByCardId = signal<Record<number, string[]>>({});
   readonly propertiesByCardId = signal<Record<number, CardPropertyDraft[]>>({});
+  readonly sectionsByCardId = signal<Record<number, CardSection[]>>({});
+  readonly isSavingSections = signal<Record<number, boolean>>({});
+  private readonly saveSectionsSubject = new Subject<number>();
   readonly aliasInputByCardId = signal<Record<number, string>>({});
   readonly searchTerm = signal('');
   readonly cardTypeSearchTerm = signal('');
@@ -1217,10 +1423,11 @@ export class WorldDetailPageComponent {
       return allCards;
     }
 
-    return allCards.filter((card) =>
-      card.cardName.toLowerCase().includes(query)
-      || card.description.toLowerCase().includes(query)
-    );
+    return allCards.filter((card) => {
+      if (card.cardName.toLowerCase().includes(query)) return true;
+      const sectionsContent = (card.sections || []).map(s => s.content).join(' ').toLowerCase();
+      return sectionsContent.includes(query);
+    });
   });
 
   readonly filteredCardTypes = computed(() => {
@@ -1267,6 +1474,13 @@ export class WorldDetailPageComponent {
   });
 
   constructor() {
+    this.saveSectionsSubject.pipe(
+      tap(cardId => this.isSavingSections.update(current => ({ ...current, [cardId]: true }))),
+      debounceTime(1000)
+    ).subscribe((cardId) => {
+      this.executeSaveSections(cardId);
+    });
+
     effect(() => {
       const worldId = this.routeWorldId();
       if (worldId <= 0) {
@@ -1286,9 +1500,9 @@ export class WorldDetailPageComponent {
             continue;
           }
 
-          const parsedType = this.extractTypeFromDescription(card.description);
-          if (parsedType) {
-            next = { ...next, [card.id]: parsedType };
+          const typeName = this.cardTypes().find(t => t.id === card.cardTypeId)?.cardTypeName;
+          if (typeName) {
+            next = { ...next, [card.id]: typeName };
           }
         }
 
@@ -1308,7 +1522,7 @@ export class WorldDetailPageComponent {
         this.aliasesByCardId.update((current) =>
           current[card.id] !== undefined
             ? current
-            : { ...current, [card.id]: [] }
+            : { ...current, [card.id]: card.aliases ?? [] }
         );
 
         this.propertiesByCardId.update((current) =>
@@ -1322,6 +1536,13 @@ export class WorldDetailPageComponent {
             ? current
             : { ...current, [card.id]: '' }
         );
+
+        this.sectionsByCardId.update((current) => {
+          if (current[card.id] !== undefined) return current;
+
+          const sections = card.sections ?? [];
+          return { ...current, [card.id]: sections };
+        });
       }
     });
   }
@@ -1345,7 +1566,7 @@ export class WorldDetailPageComponent {
   }
 
   getCardTypeLabel(card: WorldCard): string {
-    return this.cardTypeNameByCardId()[card.id] ?? this.extractTypeFromDescription(card.description) ?? 'Sem tipo';
+    return this.cardTypeNameByCardId()[card.id] ?? this.cardTypes().find(t => t.id === card.cardTypeId)?.cardTypeName ?? 'Sem tipo';
   }
 
   getCardNameDraft(card: WorldCard): string {
@@ -1354,32 +1575,76 @@ export class WorldDetailPageComponent {
 
   onCardNameDraftInput(cardId: number, event: Event): void {
     const target = event.target as HTMLInputElement | null;
+    const draft = target?.value ?? '';
     this.cardNameDraftByCardId.update((current) => ({
       ...current,
-      [cardId]: target?.value ?? '',
+      [cardId]: draft,
     }));
   }
 
   commitCardName(card: WorldCard): void {
-    const draft = (this.cardNameDraftByCardId()[card.id] ?? card.cardName).trim();
-    if (!draft) {
-      this.cardNameDraftByCardId.update((current) => ({
-        ...current,
-        [card.id]: card.cardName,
-      }));
-      return;
-    }
+    const worldId = this.routeWorldId();
+    const draft = (this.cardNameDraftByCardId()[card.id] ?? '').trim();
+    if (worldId <= 0 || !draft || draft === card.cardName) return;
 
-    this.cardNameDraftByCardId.update((current) => ({
+    this.worldsStore.updateCardName(worldId, card.id, draft).subscribe();
+  }
+
+  getCardSections(cardId: number): CardSection[] {
+    return this.sectionsByCardId()[cardId] ?? [];
+  }
+
+  addSection(cardId: number, type: string): void {
+    this.sectionsByCardId.update((current) => ({
       ...current,
-      [card.id]: draft,
+      [cardId]: [...(current[cardId] ?? []), { type, content: '' }],
     }));
+    this.saveSectionsSubject.next(cardId);
+  }
 
-    if (draft === card.cardName) {
+  removeSection(cardId: number, index: number): void {
+    this.sectionsByCardId.update((current) => {
+      const sections = [...(current[cardId] ?? [])];
+      sections.splice(index, 1);
+      return { ...current, [cardId]: sections };
+    });
+    this.saveSectionsSubject.next(cardId);
+  }
+
+  onSectionContentInput(cardId: number, index: number, event: Event): void {
+    const target = event.target as HTMLTextAreaElement | null;
+    const content = target?.value ?? '';
+    this.sectionsByCardId.update((current) => {
+      const sections = [...(current[cardId] ?? [])];
+      if (sections[index]) {
+        sections[index] = { ...sections[index], content };
+      }
+      return { ...current, [cardId]: sections };
+    });
+    this.saveSectionsSubject.next(cardId);
+  }
+
+  saveSections(cardId: number): void {
+    this.saveSectionsSubject.next(cardId);
+  }
+
+  private executeSaveSections(cardId: number): void {
+    const worldId = this.routeWorldId();
+    if (worldId <= 0) {
+      this.isSavingSections.update(current => ({ ...current, [cardId]: false }));
       return;
     }
 
-    this.worldsStore.updateCardNameLocally(this.routeWorldId(), card.id, draft);
+    const sections = this.sectionsByCardId()[cardId] || [];
+
+    this.worldsStore.saveCardSections(worldId, cardId, sections).subscribe({
+      next: () => {
+        this.isSavingSections.update(current => ({ ...current, [cardId]: false }));
+      },
+      error: () => {
+        this.isSavingSections.update(current => ({ ...current, [cardId]: false }));
+      }
+    });
   }
 
   getAliasInput(cardId: number): string {
@@ -1400,22 +1665,24 @@ export class WorldDetailPageComponent {
       return;
     }
 
-    this.aliasesByCardId.update((current) => {
-      const aliases = current[cardId] ?? [];
-      if (aliases.some((item) => item.toLowerCase() === alias.toLowerCase())) {
-        return current;
+    const worldId = this.routeWorldId();
+    if (worldId <= 0) return;
+
+    this.worldsStore.addCardAlias(worldId, cardId, alias).subscribe({
+      next: (card) => {
+        this.aliasesByCardId.update((current) => ({
+          ...current,
+          [cardId]: card.aliases ?? [],
+        }));
+        this.aliasInputByCardId.update((current) => ({
+          ...current,
+          [cardId]: '',
+        }));
+      },
+      error: (err) => {
+        console.error('Falha ao adicionar apelido', err);
       }
-
-      return {
-        ...current,
-        [cardId]: [...aliases, alias],
-      };
     });
-
-    this.aliasInputByCardId.update((current) => ({
-      ...current,
-      [cardId]: '',
-    }));
   }
 
   getCardAliases(cardId: number): string[] {
@@ -1423,10 +1690,20 @@ export class WorldDetailPageComponent {
   }
 
   removeAlias(cardId: number, alias: string): void {
-    this.aliasesByCardId.update((current) => ({
-      ...current,
-      [cardId]: (current[cardId] ?? []).filter((item) => item !== alias),
-    }));
+    const worldId = this.routeWorldId();
+    if (worldId <= 0) return;
+
+    this.worldsStore.removeCardAlias(worldId, cardId, alias).subscribe({
+      next: (card) => {
+        this.aliasesByCardId.update((current) => ({
+          ...current,
+          [cardId]: card.aliases ?? [],
+        }));
+      },
+      error: (err) => {
+        console.error('Falha ao remover apelido', err);
+      }
+    });
   }
 
   getCardProperties(cardId: number): CardPropertyDraft[] {
@@ -1550,7 +1827,7 @@ export class WorldDetailPageComponent {
       `Criado em: ${timestamp}`,
     ].join('\n');
 
-    this.worldsStore.createCard(this.routeWorldId(), cardName, description, selectedType.id).subscribe({
+    this.worldsStore.createCard(this.routeWorldId(), cardName, selectedType.id).subscribe({
       next: (createdCard) => {
         this.cardTypeNameByCardId.update((current) => ({
           ...current,
@@ -1637,23 +1914,6 @@ export class WorldDetailPageComponent {
     this.isCreateTypePopoverOpen.set(true);
   }
 
-  private extractTypeFromDescription(description?: string | null): string | null {
-    if (!description) {
-      return null;
-    }
 
-    const firstLine = description.split('\n')[0]?.trim();
-    if (!firstLine) {
-      return null;
-    }
-
-    const normalized = firstLine.toLowerCase();
-    if (!normalized.startsWith('tipo:')) {
-      return null;
-    }
-
-    const typeName = firstLine.slice(firstLine.indexOf(':') + 1).trim();
-    return typeName || null;
-  }
 
 }

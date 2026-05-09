@@ -76,14 +76,15 @@ export class WorldsStore {
         });
     }
 
-    createCard(worldId: number, cardName: string, description: string, cardTypeId: number) {
+    createCard(worldId: number, cardName: string, cardTypeId: number) {
         const tempCardId = -Date.now();
         const normalizedCardName = cardName?.trim() ? cardName.trim() : 'Card do tipo (Sem tipo)';
         const optimisticCard: WorldCard = {
             id: tempCardId,
             worldId,
+            cardTypeId,
             cardName: normalizedCardName,
-            description,
+            sections: [],
             createdAtLabel: this.formatToday(),
         };
 
@@ -93,13 +94,14 @@ export class WorldsStore {
         }));
 
         return this.apiService
-            .post<WorldCard>(`/worlds/${worldId}/cards`, { cardName: normalizedCardName, description, cardTypeId })
+            .post<WorldCard>(`/worlds/${worldId}/cards`, { cardName: normalizedCardName, cardTypeId })
             .pipe(
                 tap((card) => {
                     const persistedCard = this.normalizeCard(card, {
                         worldId,
+                        cardTypeId,
                         cardName: normalizedCardName,
-                        description,
+                        sections: [],
                         createdAtLabel: this.formatToday(),
                     });
 
@@ -144,7 +146,7 @@ export class WorldsStore {
             ...fallback,
             ...card,
             cardName: rawName,
-            description: card.description?.trim() ? card.description : (fallback?.description ?? ''),
+            sections: card.sections ?? fallback?.sections ?? [],
             createdAtLabel: card.createdAtLabel ?? fallback?.createdAtLabel ?? this.formatToday(),
         };
     }
@@ -215,5 +217,65 @@ export class WorldsStore {
         } catch {
             return dateString;
         }
+    }
+
+    addCardAlias(worldId: number, cardId: number, alias: string) {
+        return this.apiService.post<WorldCard>(`/worlds/${worldId}/cards/${cardId}/aliases`, { alias }).pipe(
+            tap((updatedCard) => {
+                this.updateCardInList(worldId, updatedCard);
+            }),
+            catchError((error) => {
+                console.error('Erro ao adicionar alias:', error);
+                throw error;
+            })
+        );
+    }
+
+    removeCardAlias(worldId: number, cardId: number, alias: string) {
+        return this.apiService.delete<WorldCard>(`/worlds/${worldId}/cards/${cardId}/aliases/${alias}`).pipe(
+            tap((updatedCard) => {
+                this.updateCardInList(worldId, updatedCard);
+            }),
+            catchError((error) => {
+                console.error('Erro ao remover alias:', error);
+                throw error;
+            })
+        );
+    }
+
+    updateCardName(worldId: number, cardId: number, cardName: string) {
+        return this.apiService.patch<WorldCard>(`/worlds/${worldId}/cards/${cardId}/name`, { cardName }).pipe(
+            tap((updatedCard) => {
+                this.updateCardInList(worldId, updatedCard);
+            }),
+            catchError((error) => {
+                console.error('Erro ao atualizar nome do card:', error);
+                throw error;
+            })
+        );
+    }
+
+    saveCardSections(worldId: number, cardId: number, sections: any[]) {
+        return this.apiService.put<WorldCard>(`/worlds/${worldId}/cards/${cardId}/sections`, { sections }).pipe(
+            tap((updatedCard) => {
+                this.updateCardInList(worldId, updatedCard);
+            }),
+            catchError((error) => {
+                console.error('Erro ao salvar seções do card:', error);
+                throw error;
+            })
+        );
+    }
+
+    private updateCardInList(worldId: number, updatedCard: WorldCard) {
+        this.cardsByWorld.update((current) => {
+            const cards = current[worldId] ?? [];
+            return {
+                ...current,
+                [worldId]: cards.map((card) =>
+                    card.id === updatedCard.id ? this.normalizeCard(updatedCard, card) : card
+                ),
+            };
+        });
     }
 }

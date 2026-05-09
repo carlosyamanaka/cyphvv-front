@@ -26,4 +26,8 @@ export class ApiService {
     delete<T>(endpoint: string) {
         return this.http.delete<T>(`${this.apiUrl}${endpoint}`);
     }
+
+    patch<T>(endpoint: string, data: any) {
+        return this.http.patch<T>(`${this.apiUrl}${endpoint}`, data);
+    }
 }
