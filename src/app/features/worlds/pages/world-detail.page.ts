@@ -3,7 +3,7 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { map, Subject, debounceTime, tap } from 'rxjs';
-import { LucideAngularModule, Ghost, ScrollText, User, Calendar, Shield, Map as MapIcon, Users, Eye, Crosshair, Star, MapPin, Crown, BookOpen, Sun, Book, FileQuestion, AlignLeft, Type } from 'lucide-angular';
+import { LucideAngularModule, Ghost, ScrollText, User, Calendar, Shield, Map as MapIcon, Users, Eye, Crosshair, Star, MapPin, Crown, BookOpen, Sun, Book, FileQuestion, AlignLeft, Type, Trash2, ChevronDown } from 'lucide-angular';
 import { WorldsStore } from '../data-access/worlds.store';
 import { WorldCard } from '../models/world-card.model';
 
@@ -14,8 +14,10 @@ export interface CardSection {
 }
 
 interface CardPropertyDraft {
-  key: string;
-  value: string;
+  typeId: number | null;
+  cardIds: number[];
+  key?: string;
+  value?: string;
 }
 
 const CREATE_CARD_TYPE_OPTION_VALUE = '__create_new_card_type__';
@@ -97,10 +99,22 @@ const CREATE_CARD_TYPE_OPTION_VALUE = '__create_new_card_type__';
                   <section
                     class="note-panels"
                     [class.note-panels-single]="visibleCards().length === 1"
+                    [class.note-panels-double]="visibleCards().length === 2"
+                    [class.note-panels-triple]="visibleCards().length === 3"
                     aria-label="Visualizacao simultanea de cards"
                   >
                     @for (selectedCard of visibleCards(); track selectedCard.id) {
                       <article class="note-panel" role="tabpanel">
+                        <div class="note-panel-actions">
+                          <button
+                            type="button"
+                            class="icon-btn panel-close"
+                            (click)="closeCard(selectedCard.id)"
+                            [attr.aria-label]="'Fechar nota ' + selectedCard.cardName"
+                          >
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                          </button>
+                        </div>
                         <div class="note-panel-grid">
                           <div class="note-panel-content">
                             <header class="note-header-inline">
@@ -118,14 +132,6 @@ const CREATE_CARD_TYPE_OPTION_VALUE = '__create_new_card_type__';
                                   <lucide-icon [img]="getCardIcon(selectedCard)" [size]="14" strokeWidth="2.5"></lucide-icon>
                                   {{ getCardTypeLabel(selectedCard) }}
                                 </span>
-                                <button
-                                  type="button"
-                                  class="icon-btn panel-close"
-                                  (click)="closeCard(selectedCard.id)"
-                                  [attr.aria-label]="'Fechar nota ' + selectedCard.cardName"
-                                >
-                                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-                                </button>
                               </div>
                             </header>
 
@@ -156,34 +162,92 @@ const CREATE_CARD_TYPE_OPTION_VALUE = '__create_new_card_type__';
                             </section>
 
                             <section class="note-section" style="border: none; padding-top: 0; margin-top: 0.5rem;">
-                              <div class="section-head">
-                                <button type="button" class="secondary-action add-prop-btn" (click)="addProperty(selectedCard.id)">+ Adicionar Propriedade</button>
+                              <div class="section-head" style="position: relative;">
+                                <button type="button" class="secondary-action add-prop-btn" (click)="openAddPropertyPopover(selectedCard.id)">+ Adicionar Propriedade</button>
+                                
+                                @if (activePropertyPopoverCardId() === selectedCard.id) {
+                                  <div class="property-type-popover">
+                                    <div class="popover-header">
+                                      <lucide-icon [img]="AlignLeftIcon" [size]="14"></lucide-icon>
+                                      <span>Nome da propriedade</span>
+                                    </div>
+                                    <div class="popover-section-title">
+                                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg>
+                                      TIPO
+                                    </div>
+                                    <button type="button" class="type-option" (click)="selectPropertyType(selectedCard.id, null)">
+                                      <lucide-icon [img]="TypeIcon" [size]="14"></lucide-icon>
+                                      Texto
+                                    </button>
+                                    <div class="type-options-list">
+                                      @for (type of cardTypes(); track type.id) {
+                                        <button type="button" class="type-option indented" (click)="selectPropertyType(selectedCard.id, type.id)">
+                                          <lucide-icon [img]="getIcon(type.iconType)" [size]="14"></lucide-icon>
+                                          {{ type.cardTypeName }}
+                                        </button>
+                                      }
+                                    </div>
+                                  </div>
+                                }
                               </div>
 
                               @if (getCardProperties(selectedCard.id).length) {
                                 <div class="property-list" style="margin-top: 1rem;">
-                                  @for (property of getCardProperties(selectedCard.id); track $index) {
-                                    <div class="property-row">
-                                      <input
-                                        type="text"
-                                        placeholder="Nome"
-                                        [value]="property.key"
-                                        (input)="onPropertyKeyInput(selectedCard.id, $index, $event)"
-                                      />
-                                      <input
-                                        type="text"
-                                        placeholder="Valor"
-                                        [value]="property.value"
-                                        (input)="onPropertyValueInput(selectedCard.id, $index, $event)"
-                                      />
-                                      <button
-                                        type="button"
-                                        class="icon-action"
-                                        aria-label="Remover propriedade"
-                                        (click)="removeProperty(selectedCard.id, $index)"
-                                      >
-                                        x
-                                      </button>
+                                  @for (property of getCardProperties(selectedCard.id); track $index; let propIndex = $index) {
+                                    <div class="property-row linked-cards-row">
+                                      <div class="property-type-label">
+                                         @if (property.typeId !== null) {
+                                           <lucide-icon [img]="getIcon(getType(property.typeId)?.iconType)" [size]="14" strokeWidth="2.5"></lucide-icon>
+                                         } @else {
+                                           <lucide-icon [img]="TypeIcon" [size]="14" strokeWidth="2.5"></lucide-icon>
+                                         }
+                                         <input 
+                                           type="text" 
+                                           class="prop-name-input" 
+                                           [class.is-editing]="renamingPropertyId() === selectedCard.id + '-' + propIndex"
+                                           [readonly]="renamingPropertyId() !== selectedCard.id + '-' + propIndex"
+                                           [value]="property.key || (property.typeId ? getType(property.typeId)?.cardTypeName : 'Texto')"
+                                           (dblclick)="startRenamingProperty(selectedCard.id, propIndex, $event)"
+                                           (blur)="stopRenamingProperty()"
+                                           (keyup.enter)="stopRenamingProperty()"
+                                           (input)="onPropertyKeyInput(selectedCard.id, propIndex, $event)"
+                                         >
+                                      </div>
+                                      <div class="property-cards-container">
+                                         @if (property.typeId === null) {
+                                           <input type="text" class="property-text-input" placeholder="Valor do texto..." [value]="property.value || ''" (input)="onPropertyValueInput(selectedCard.id, propIndex, $event)">
+                                         } @else {
+                                           @for (relCardId of property.cardIds; track relCardId) {
+                                             <div class="linked-card-chip">
+                                               <lucide-icon [img]="getCardIconById(relCardId)" [size]="12" strokeWidth="2.5"></lucide-icon>
+                                               <span>{{ getCardName(relCardId) }}</span>
+                                               <button class="remove-chip" (click)="removePropertyCard(selectedCard.id, propIndex, relCardId)">x</button>
+                                             </div>
+                                           }
+                                           <div class="card-select-custom-wrapper" style="position: relative; flex: 1;">
+                                             <button type="button" class="card-select-custom-trigger card-select-inline" (click)="toggleCardSelectPopover(selectedCard.id, propIndex)">
+                                               <span>Selecione {{ getType(property.typeId)?.cardTypeName }}(s)</span>
+                                               <lucide-icon [img]="ChevronDownIcon" [size]="14"></lucide-icon>
+                                             </button>
+                                             
+                                             @if (activeCardSelectPopoverId() === selectedCard.id + '-' + propIndex) {
+                                               <div class="card-select-popover">
+                                                  @for (c of getCardsByType(property.typeId); track c.id) {
+                                                    <button type="button" class="card-option" [disabled]="property.cardIds.includes(c.id)" (click)="selectCardForProperty(selectedCard.id, propIndex, c.id)">
+                                                       <lucide-icon [img]="getCardIconById(c.id)" [size]="14"></lucide-icon>
+                                                       {{ c.cardName }}
+                                                    </button>
+                                                  } @empty {
+                                                    <div class="card-option-empty">Nenhum card deste tipo encontrado</div>
+                                                  }
+                                               </div>
+                                             }
+                                           </div>
+                                         }
+                                         <button class="remove-property-btn" (click)="removeProperty(selectedCard.id, propIndex)" aria-label="Remover linha">
+                                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                                         </button>
+                                      </div>
                                     </div>
                                   }
                                 </div>
@@ -205,11 +269,11 @@ const CREATE_CARD_TYPE_OPTION_VALUE = '__create_new_card_type__';
                                     </div>
                                     <button
                                       type="button"
-                                      class="icon-action"
+                                      class="section-delete-btn"
                                       aria-label="Remover seção"
                                       (click)="removeSection(selectedCard.id, $index)"
                                     >
-                                      x
+                                      <lucide-icon [img]="TrashIcon" [size]="14" strokeWidth="2"></lucide-icon>
                                     </button>
                                   </div>
                                   <textarea
@@ -421,11 +485,11 @@ const CREATE_CARD_TYPE_OPTION_VALUE = '__create_new_card_type__';
       margin: 1rem auto;
       width: 100%;
       max-width: none;
-      padding: 0 2rem;
+      padding: 0 1rem;
       min-height: auto;
       display: grid;
-      grid-template-columns: 320px minmax(0, 1fr);
-      gap: 3rem;
+      grid-template-columns: 300px minmax(0, 1fr);
+      gap: 0.5rem;
     }
 
     .vault-sidebar {
@@ -583,22 +647,20 @@ const CREATE_CARD_TYPE_OPTION_VALUE = '__create_new_card_type__';
     }
 
     .floating-create-button {
-      border-radius: 0.72rem;
-      border: 1px solid rgba(116, 193, 255, 0.32);
-      background: linear-gradient(135deg, rgba(84, 175, 255, 0.95) 0%, rgba(79, 132, 255, 0.98) 100%);
+      border-radius: 0.5rem;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      background: var(--color-brand-blue);
       color: #ffffff;
-      padding: 0.72rem 0.8rem;
-      font-size: 0.84rem;
-      font-weight: 700;
+      padding: 0.6rem 1rem;
+      font-size: 0.85rem;
+      font-weight: 600;
       cursor: pointer;
-      box-shadow: 0 10px 24px rgba(68, 144, 255, 0.35);
-      transition: transform 0.15s ease, filter 0.15s ease, box-shadow 0.15s ease;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+      transition: all 0.2s ease;
     }
 
     .floating-create-button:hover:not(:disabled) {
-      transform: translateY(-1px);
       filter: brightness(1.06);
-      box-shadow: 0 14px 28px rgba(68, 144, 255, 0.42);
     }
 
     .floating-create-button:disabled {
@@ -620,8 +682,7 @@ const CREATE_CARD_TYPE_OPTION_VALUE = '__create_new_card_type__';
     }
 
     .tree-item:hover {
-      transform: translateY(-1px);
-      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+      background: rgba(40, 42, 50, 0.85);
     }
 
     .tree-item.is-active {
@@ -688,6 +749,7 @@ const CREATE_CARD_TYPE_OPTION_VALUE = '__create_new_card_type__';
 
     .note-panel,
     .empty-state {
+      position: relative;
       border-radius: 1rem;
       background: linear-gradient(180deg, rgba(20, 22, 30, 0.92) 0%, rgba(15, 17, 24, 0.95) 100%);
       border: 1px solid rgba(255, 255, 255, 0.08);
@@ -737,13 +799,20 @@ const CREATE_CARD_TYPE_OPTION_VALUE = '__create_new_card_type__';
 
     .note-panels {
       display: grid;
-      gap: 0.75rem;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.5rem;
       align-items: start;
     }
 
     .note-panels.note-panels-single {
       grid-template-columns: minmax(0, 1fr);
+    }
+
+    .note-panels.note-panels-double {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .note-panels.note-panels-triple {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
     }
 
     label {
@@ -756,7 +825,7 @@ const CREATE_CARD_TYPE_OPTION_VALUE = '__create_new_card_type__';
     select,
     textarea {
       width: 100%;
-      border-radius: 0.5rem;
+      border-radius: 0.25rem;
       background: rgba(50, 50, 58, 0.56);
       padding: 0.52rem 0.62rem;
       font-size: 0.84rem;
@@ -882,6 +951,24 @@ const CREATE_CARD_TYPE_OPTION_VALUE = '__create_new_card_type__';
     }
     .icon-btn:hover {
       color: var(--color-text-primary);
+    }
+
+    .note-panel-actions {
+      display: flex;
+      justify-content: flex-end;
+      margin-bottom: 0.5rem;
+      z-index: 10;
+    }
+
+    .panel-close {
+      padding: 0.4rem;
+      border-radius: 0.4rem;
+      background: rgba(255, 255, 255, 0.03);
+      transition: background 0.2s ease;
+    }
+
+    .panel-close:hover {
+      background: rgba(255, 255, 255, 0.08);
     }
 
     .aliases-inline-section {
@@ -1057,23 +1144,21 @@ const CREATE_CARD_TYPE_OPTION_VALUE = '__create_new_card_type__';
     }
 
     .primary-action {
-      border-radius: 0.52rem;
-      border: none;
-      background: linear-gradient(135deg, var(--color-brand-blue) 0%, var(--color-brand-blue-strong) 100%);
+      border-radius: 0.4rem;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      background: var(--color-brand-blue);
       color: #ffffff;
-      padding: 0.58rem 0.72rem;
-      font-size: 0.8rem;
-      font-weight: 700;
+      padding: 0.5rem 0.9rem;
+      font-size: 0.82rem;
+      font-weight: 600;
       cursor: pointer;
-      box-shadow: 0 4px 14px rgba(102, 169, 255, 0.22);
-      transition: transform 0.15s ease, filter 0.15s ease, box-shadow 0.15s ease;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+      transition: all 0.2s ease;
       justify-self: start;
     }
 
     .primary-action:hover:not(:disabled) {
-      transform: translateY(-1px);
       filter: brightness(1.05);
-      box-shadow: 0 6px 18px rgba(102, 169, 255, 0.28);
     }
 
     .primary-action:disabled {
@@ -1185,11 +1270,280 @@ const CREATE_CARD_TYPE_OPTION_VALUE = '__create_new_card_type__';
       gap: 0.5rem;
     }
 
-    .property-row {
+    .linked-cards-row {
       display: grid;
-      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
-      gap: 0.45rem;
+      grid-template-columns: 140px minmax(0, 1fr);
+      gap: 1rem;
+      align-items: start;
+      margin-bottom: 0.5rem;
+    }
+
+    .property-type-label {
+      display: flex;
       align-items: center;
+      gap: 0.5rem;
+      color: var(--color-text-secondary);
+      font-size: 0.85rem;
+      font-weight: 600;
+      padding-top: 0.4rem;
+    }
+
+    .prop-name-input {
+      background: transparent;
+      border: 1px solid transparent;
+      color: inherit;
+      font-size: inherit;
+      font-weight: inherit;
+      padding: 0 0.2rem;
+      margin-left: -0.2rem;
+      width: 110px;
+      outline: none;
+      box-shadow: none;
+      cursor: default;
+      text-overflow: ellipsis;
+    }
+    
+    .prop-name-input.is-editing {
+      background: rgba(0, 0, 0, 0.2);
+      border: 1px solid var(--color-brand-blue);
+      color: var(--color-text-primary);
+      cursor: text;
+    }
+
+    .property-cards-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+      background: rgba(50, 50, 58, 0.44);
+      border-radius: 0.25rem;
+      padding: 0.3rem 0.4rem;
+      min-height: 2.4rem;
+      align-items: center;
+      box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2);
+    }
+
+    .linked-card-chip {
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 0.4rem;
+      padding: 0.2rem 0.4rem;
+      font-size: 0.75rem;
+      color: var(--color-text-primary);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .remove-chip {
+      background: transparent;
+      border: none;
+      color: var(--color-text-muted);
+      cursor: pointer;
+      padding: 0 0 0 0.2rem;
+      font-size: 0.8rem;
+      line-height: 1;
+    }
+
+    .remove-chip:hover {
+      color: var(--color-danger);
+    }
+
+    .card-select-inline {
+      appearance: none;
+      background: rgba(255, 255, 255, 0.03);
+      background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='rgba(255,255,255,0.4)' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 0.6rem center;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 0.4rem;
+      box-shadow: none;
+      color: var(--color-text-primary);
+      padding: 0.3rem 2rem 0.3rem 0.6rem;
+      font-size: 0.8rem;
+      font-weight: 500;
+      flex: 1;
+      min-width: 180px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .card-select-inline:hover {
+      background-color: rgba(255, 255, 255, 0.08);
+      border-color: rgba(255, 255, 255, 0.15);
+    }
+
+    .card-select-inline:focus-visible {
+      outline: 2px solid var(--color-focus-ring);
+      outline-offset: -1px;
+    }
+
+    .property-text-input {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 0.25rem;
+      color: var(--color-text-primary);
+      padding: 0.3rem 0.6rem;
+      font-size: 0.8rem;
+      font-weight: 500;
+      flex: 1;
+      width: auto;
+      transition: all 0.2s ease;
+      outline: none;
+    }
+
+    .property-text-input:hover {
+      background-color: rgba(255, 255, 255, 0.08);
+      border-color: rgba(255, 255, 255, 0.15);
+    }
+
+    .property-text-input:focus-visible {
+      outline: 2px solid var(--color-focus-ring);
+      outline-offset: -1px;
+    }
+
+    .card-select-custom-trigger {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      text-align: left;
+      background: transparent;
+      border: none;
+    }
+
+    .card-select-popover {
+      position: absolute;
+      top: calc(100% + 0.4rem);
+      left: 0;
+      right: 0;
+      background: #1d2028;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 0.5rem;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+      z-index: 50;
+      padding: 0.3rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.1rem;
+      max-height: 250px;
+      overflow-y: auto;
+    }
+
+    .card-option {
+      display: flex;
+      width: 100%;
+      align-items: center;
+      gap: 0.6rem;
+      background: transparent;
+      border: none;
+      color: var(--color-text-primary);
+      padding: 0.5rem 0.6rem;
+      border-radius: 0.4rem;
+      font-size: 0.8rem;
+      cursor: pointer;
+      text-align: left;
+      transition: background 0.15s ease;
+    }
+
+    .card-option:hover:not(:disabled) {
+      background: rgba(255, 255, 255, 0.06);
+    }
+
+    .card-option:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+      color: var(--color-text-muted);
+    }
+
+    .card-option-empty {
+      padding: 0.6rem;
+      color: var(--color-text-muted);
+      font-size: 0.8rem;
+      text-align: center;
+    }
+
+    .remove-property-btn {
+      background: transparent;
+      border: none;
+      color: var(--color-text-muted);
+      cursor: pointer;
+      padding: 0.2rem;
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+    }
+
+    .remove-property-btn:hover {
+      color: var(--color-danger);
+    }
+
+    .property-type-popover {
+      position: absolute;
+      top: calc(100% + 0.4rem);
+      left: 0;
+      width: 220px;
+      background: #1d2028;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 0.5rem;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+      z-index: 50;
+      padding: 0.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.2rem;
+    }
+
+    .popover-header {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.4rem 0.5rem;
+      color: var(--color-text-secondary);
+      font-size: 0.8rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      margin-bottom: 0.2rem;
+    }
+
+    .popover-section-title {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.4rem 0.5rem;
+      color: var(--color-text-muted);
+      font-size: 0.65rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .type-options-list {
+      display: flex;
+      flex-direction: column;
+      width: 100%;
+    }
+
+    .type-option {
+      display: flex;
+      width: 100%;
+      align-items: center;
+      gap: 0.5rem;
+      background: transparent;
+      border: none;
+      color: var(--color-text-primary);
+      padding: 0.5rem 0.6rem;
+      border-radius: 0.4rem;
+      font-size: 0.82rem;
+      cursor: pointer;
+      text-align: left;
+      transition: background 0.15s ease;
+    }
+
+    .type-option:hover {
+      background: rgba(255, 255, 255, 0.06);
+    }
+
+    .type-option.indented {
+      padding-left: 1.5rem;
     }
 
     .note-panel h3,
@@ -1225,10 +1579,33 @@ const CREATE_CARD_TYPE_OPTION_VALUE = '__create_new_card_type__';
       align-items: center;
     }
 
+    .section-delete-btn {
+      background: transparent;
+      border: none;
+      color: var(--color-text-muted);
+      cursor: pointer;
+      padding: 0.4rem;
+      border-radius: 0.4rem;
+      opacity: 0;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .card-section:hover .section-delete-btn {
+      opacity: 1;
+    }
+
+    .section-delete-btn:hover {
+      background: rgba(255, 68, 68, 0.12);
+      color: #ff5f5f;
+    }
+
     .section-type-label {
       display: flex;
       align-items: center;
-      gap: 0.4rem;
+      gap: 0.7rem;
       color: var(--color-text-muted);
       font-size: 0.68rem;
       font-weight: 700;
@@ -1238,15 +1615,16 @@ const CREATE_CARD_TYPE_OPTION_VALUE = '__create_new_card_type__';
 
     .section-textarea {
       width: 100%;
-      background: transparent;
+      background: rgba(50, 50, 58, 0.4);
       border: none;
       color: var(--color-text-primary);
       font-size: 0.9rem;
       line-height: 1.6;
       resize: none;
       min-height: 2.5rem;
-      padding: 0;
+      padding: 0.6rem;
       font-family: inherit;
+      border-radius: 0.25rem;
     }
 
     .section-textarea:focus {
@@ -1353,6 +1731,9 @@ export class WorldDetailPageComponent {
   readonly GhostIcon = Ghost;
   readonly AlignLeftIcon = AlignLeft;
   readonly TypeIcon = Type;
+  readonly FileQuestionIcon = FileQuestion;
+  readonly TrashIcon = Trash2;
+  readonly ChevronDownIcon = ChevronDown;
 
   private readonly iconMap: Record<string, any> = {
     'user': User,
@@ -1381,6 +1762,29 @@ export class WorldDetailPageComponent {
     const typeLabel = this.getCardTypeLabel(card);
     const type = this.cardTypes().find((t) => t.cardTypeName.toLowerCase() === typeLabel.toLowerCase());
     return this.getIcon(type?.iconType);
+  }
+
+  getType(typeId: number | null): any {
+    if (!typeId) return null;
+    return this.cardTypes().find(t => t.id === Number(typeId));
+  }
+
+  getCardsByType(typeId: number | null): WorldCard[] {
+    if (!typeId) return [];
+    return this.cards().filter(c => c.cardTypeId === Number(typeId));
+  }
+
+  getCardName(cardId: number): string {
+    const card = this.cards().find(c => c.id === Number(cardId));
+    return card ? card.cardName : 'Desconhecido';
+  }
+
+  getCardIconById(cardId: number): any {
+    const card = this.cards().find(c => c.id === Number(cardId));
+    if (card) {
+      return this.getCardIcon(card);
+    }
+    return this.FileQuestionIcon;
   }
 
   private readonly worldsStore = inject(WorldsStore);
@@ -1415,6 +1819,9 @@ export class WorldDetailPageComponent {
   readonly cardTypeSearchTerm = signal('');
   readonly openCardIds = signal<number[]>([]);
   readonly activeCardId = signal<number | null>(null);
+  readonly activePropertyPopoverCardId = signal<number | null>(null);
+  readonly renamingPropertyId = signal<string | null>(null);
+  readonly activeCardSelectPopoverId = signal<string | null>(null);
 
   readonly filteredCards = computed(() => {
     const query = this.searchTerm().trim().toLowerCase();
@@ -1457,12 +1864,12 @@ export class WorldDetailPageComponent {
 
     const activeId = this.activeCardId();
     if (activeId === null) {
-      return openCards.slice(0, 2);
+      return openCards.slice(0, 3);
     }
 
     const cardMap = new Map(openCards.map((card) => [card.id, card]));
     const orderedIds = [activeId, ...[...this.openCardIds()].reverse().filter((id) => id !== activeId)];
-    const visibleIds = orderedIds.slice(0, 2);
+    const visibleIds = orderedIds.slice(0, 3);
 
     return visibleIds
       .map((id) => cardMap.get(id))
@@ -1710,11 +2117,30 @@ export class WorldDetailPageComponent {
     return this.propertiesByCardId()[cardId] ?? [];
   }
 
-  addProperty(cardId: number): void {
+  openAddPropertyPopover(cardId: number): void {
+    this.activePropertyPopoverCardId.update(current => current === cardId ? null : cardId);
+  }
+
+  selectPropertyType(cardId: number, typeId: number | null): void {
     this.propertiesByCardId.update((current) => ({
       ...current,
-      [cardId]: [...(current[cardId] ?? []), { key: '', value: '' }],
+      [cardId]: [...(current[cardId] ?? []), { typeId, cardIds: [], key: '', value: '' }],
     }));
+    this.activePropertyPopoverCardId.set(null);
+  }
+
+  startRenamingProperty(cardId: number, index: number, event: MouseEvent): void {
+    this.renamingPropertyId.set(`${cardId}-${index}`);
+    const target = event.target as HTMLInputElement;
+    target.removeAttribute('readonly');
+    setTimeout(() => {
+      target.focus();
+      target.select();
+    });
+  }
+
+  stopRenamingProperty(): void {
+    this.renamingPropertyId.set(null);
   }
 
   removeProperty(cardId: number, index: number): void {
@@ -1748,10 +2174,42 @@ export class WorldDetailPageComponent {
     }));
   }
 
+  toggleCardSelectPopover(cardId: number, index: number): void {
+    const id = `${cardId}-${index}`;
+    this.activeCardSelectPopoverId.update(current => current === id ? null : id);
+  }
+
+  selectCardForProperty(cardId: number, index: number, relCardId: number): void {
+    this.propertiesByCardId.update((current) => ({
+      ...current,
+      [cardId]: (current[cardId] ?? []).map((item, itemIndex) =>
+        itemIndex === index && !item.cardIds.includes(relCardId)
+          ? { ...item, cardIds: [...item.cardIds, relCardId] }
+          : item
+      ),
+    }));
+  }
+
+  removePropertyCard(cardId: number, index: number, relCardId: number): void {
+    this.propertiesByCardId.update((current) => ({
+      ...current,
+      [cardId]: (current[cardId] ?? []).map((item, itemIndex) =>
+        itemIndex === index
+          ? { ...item, cardIds: item.cardIds.filter(id => id !== relCardId) }
+          : item
+      ),
+    }));
+  }
+
   openCard(cardId: number): void {
-    this.openCardIds.update((currentIds) =>
-      currentIds.includes(cardId) ? currentIds : [...currentIds, cardId]
-    );
+    this.openCardIds.update((currentIds) => {
+      if (currentIds.includes(cardId)) return currentIds;
+      const nextIds = [...currentIds, cardId];
+      if (nextIds.length > 3) {
+        nextIds.shift();
+      }
+      return nextIds;
+    });
     this.activeCardId.set(cardId);
   }
 
