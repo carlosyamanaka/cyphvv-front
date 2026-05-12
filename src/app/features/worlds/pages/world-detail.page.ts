@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, signal, HostListener } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { toSignal } from '@angular/core/rxjs-interop';
@@ -6,6 +6,7 @@ import { map, Subject, debounceTime, tap } from 'rxjs';
 import { LucideAngularModule, Ghost, ScrollText, User, Calendar, Shield, Map as MapIcon, Users, Eye, Crosshair, Star, MapPin, Crown, BookOpen, Sun, Book, FileQuestion, AlignLeft, Type, Trash2, ChevronDown } from 'lucide-angular';
 import { WorldsStore } from '../data-access/worlds.store';
 import { WorldCard } from '../models/world-card.model';
+import { CardRelationship, CardRelationshipTarget } from '../models/card-relationship.model';
 
 export interface CardSection {
   id?: number;
@@ -14,8 +15,9 @@ export interface CardSection {
 }
 
 interface CardPropertyDraft {
+  id?: number;
   typeId: number | null;
-  cardIds: number[];
+  targets: CardRelationshipTarget[];
   key?: string;
   value?: string;
 }
@@ -217,11 +219,11 @@ const CREATE_CARD_TYPE_OPTION_VALUE = '__create_new_card_type__';
                                          @if (property.typeId === null) {
                                            <input type="text" class="property-text-input" placeholder="Valor do texto..." [value]="property.value || ''" (input)="onPropertyValueInput(selectedCard.id, propIndex, $event)">
                                          } @else {
-                                           @for (relCardId of property.cardIds; track relCardId) {
+                                           @for (target of property.targets; track target.targetCardId) {
                                              <div class="linked-card-chip">
-                                               <lucide-icon [img]="getCardIconById(relCardId)" [size]="12" strokeWidth="2.5"></lucide-icon>
-                                               <span>{{ getCardName(relCardId) }}</span>
-                                               <button class="remove-chip" (click)="removePropertyCard(selectedCard.id, propIndex, relCardId)">x</button>
+                                               <lucide-icon [img]="getCardIconById(target.targetCardId)" [size]="12" strokeWidth="2.5"></lucide-icon>
+                                               <span>{{ getCardName(target.targetCardId) }}</span>
+                                               <button class="remove-chip" (click)="removePropertyCard(selectedCard.id, propIndex, target.targetCardId)">x</button>
                                              </div>
                                            }
                                            <div class="card-select-custom-wrapper" style="position: relative; flex: 1;">
@@ -233,7 +235,7 @@ const CREATE_CARD_TYPE_OPTION_VALUE = '__create_new_card_type__';
                                              @if (activeCardSelectPopoverId() === selectedCard.id + '-' + propIndex) {
                                                <div class="card-select-popover">
                                                   @for (c of getCardsByType(property.typeId); track c.id) {
-                                                    <button type="button" class="card-option" [disabled]="property.cardIds.includes(c.id)" (click)="selectCardForProperty(selectedCard.id, propIndex, c.id)">
+                                                    <button type="button" class="card-option" [disabled]="property.targets.some(t => t.targetCardId === c.id)" (click)="selectCardForProperty(selectedCard.id, propIndex, c.id)">
                                                        <lucide-icon [img]="getCardIconById(c.id)" [size]="14"></lucide-icon>
                                                        {{ c.cardName }}
                                                     </button>
@@ -1797,6 +1799,21 @@ export class WorldDetailPageComponent {
   );
 
   readonly world = computed(() => this.worldsStore.getWorldById(this.routeWorldId()));
+  @HostListener('document:click', ['$event'])
+  onDocumentClick(event: MouseEvent): void {
+    const target = event.target as HTMLElement;
+
+    // Close card select popover if clicking outside its wrapper
+    if (!target.closest('.card-select-custom-wrapper')) {
+      this.activeCardSelectPopoverId.set(null);
+    }
+
+    // Close property type popover if clicking outside its trigger or menu
+    if (!target.closest('.section-head')) {
+      this.activePropertyPopoverCardId.set(null);
+    }
+  }
+
   readonly cards = computed(() => this.worldsStore.getCardsByWorldId(this.routeWorldId()));
   readonly cardTypes = computed(() => this.worldsStore.getCardTypes().filter((type) => !type.deleted));
   readonly isLoadingCardTypes = computed(() => this.worldsStore.isLoadingCardTypes());
@@ -1813,7 +1830,9 @@ export class WorldDetailPageComponent {
   readonly propertiesByCardId = signal<Record<number, CardPropertyDraft[]>>({});
   readonly sectionsByCardId = signal<Record<number, CardSection[]>>({});
   readonly isSavingSections = signal<Record<number, boolean>>({});
+  readonly isSavingRelationships = signal<Record<number, boolean>>({});
   private readonly saveSectionsSubject = new Subject<number>();
+  private readonly saveRelationshipsSubject = new Subject<number>();
   readonly aliasInputByCardId = signal<Record<number, string>>({});
   readonly searchTerm = signal('');
   readonly cardTypeSearchTerm = signal('');
@@ -1888,6 +1907,13 @@ export class WorldDetailPageComponent {
       this.executeSaveSections(cardId);
     });
 
+    this.saveRelationshipsSubject.pipe(
+      tap(cardId => this.isSavingRelationships.update(current => ({ ...current, [cardId]: true }))),
+      debounceTime(1000)
+    ).subscribe((cardId) => {
+      this.executeSaveRelationships(cardId);
+    });
+
     effect(() => {
       const worldId = this.routeWorldId();
       if (worldId <= 0) {
@@ -1932,11 +1958,37 @@ export class WorldDetailPageComponent {
             : { ...current, [card.id]: card.aliases ?? [] }
         );
 
-        this.propertiesByCardId.update((current) =>
-          current[card.id] !== undefined
-            ? current
-            : { ...current, [card.id]: [] }
-        );
+        this.propertiesByCardId.update((current) => {
+          if (current[card.id] !== undefined) {
+            // Optional: Update missing typeIds if cardTypes just loaded
+            const hasPossibleTypeUpdates = current[card.id].some(p => p.typeId === null && p.key);
+            if (hasPossibleTypeUpdates && this.cardTypes().length > 0) {
+              return {
+                ...current,
+                [card.id]: current[card.id].map(p => {
+                  if (p.typeId !== null) return p;
+                  const type = this.cardTypes().find(t => t.cardTypeName === p.key);
+                  return type ? { ...p, typeId: type.id } : p;
+                })
+              };
+            }
+            return current;
+          }
+          
+          const relationships = card.relationships ?? [];
+          const drafts: CardPropertyDraft[] = relationships.map(rel => {
+            const type = this.cardTypes().find(t => t.cardTypeName === rel.name);
+            return {
+              id: rel.id,
+              typeId: type ? type.id : null,
+              targets: rel.targets ?? [],
+              key: rel.name,
+              value: ''
+            };
+          });
+          
+          return { ...current, [card.id]: drafts };
+        });
 
         this.aliasInputByCardId.update((current) =>
           current[card.id] !== undefined
@@ -2054,6 +2106,30 @@ export class WorldDetailPageComponent {
     });
   }
 
+  private executeSaveRelationships(cardId: number): void {
+    const worldId = this.routeWorldId();
+    if (worldId <= 0) {
+      this.isSavingRelationships.update(current => ({ ...current, [cardId]: false }));
+      return;
+    }
+
+    const drafts = this.propertiesByCardId()[cardId] || [];
+    const relationships: CardRelationship[] = drafts.map(d => ({
+      id: d.id,
+      name: d.key || (d.typeId ? this.getType(d.typeId)?.cardTypeName : 'Propriedade') || 'Propriedade',
+      targets: d.targets
+    }));
+
+    this.worldsStore.saveCardRelationships(worldId, cardId, relationships).subscribe({
+      next: () => {
+        this.isSavingRelationships.update(current => ({ ...current, [cardId]: false }));
+      },
+      error: () => {
+        this.isSavingRelationships.update(current => ({ ...current, [cardId]: false }));
+      }
+    });
+  }
+
   getAliasInput(cardId: number): string {
     return this.aliasInputByCardId()[cardId] ?? '';
   }
@@ -2124,9 +2200,10 @@ export class WorldDetailPageComponent {
   selectPropertyType(cardId: number, typeId: number | null): void {
     this.propertiesByCardId.update((current) => ({
       ...current,
-      [cardId]: [...(current[cardId] ?? []), { typeId, cardIds: [], key: '', value: '' }],
+      [cardId]: [...(current[cardId] ?? []), { typeId, targets: [], key: '', value: '' }],
     }));
     this.activePropertyPopoverCardId.set(null);
+    this.saveRelationshipsSubject.next(cardId);
   }
 
   startRenamingProperty(cardId: number, index: number, event: MouseEvent): void {
@@ -2148,6 +2225,7 @@ export class WorldDetailPageComponent {
       ...current,
       [cardId]: (current[cardId] ?? []).filter((_, itemIndex) => itemIndex !== index),
     }));
+    this.saveRelationshipsSubject.next(cardId);
   }
 
   onPropertyKeyInput(cardId: number, index: number, event: Event): void {
@@ -2160,6 +2238,7 @@ export class WorldDetailPageComponent {
           : item
       ),
     }));
+    this.saveRelationshipsSubject.next(cardId);
   }
 
   onPropertyValueInput(cardId: number, index: number, event: Event): void {
@@ -2172,6 +2251,7 @@ export class WorldDetailPageComponent {
           : item
       ),
     }));
+    this.saveRelationshipsSubject.next(cardId);
   }
 
   toggleCardSelectPopover(cardId: number, index: number): void {
@@ -2183,11 +2263,12 @@ export class WorldDetailPageComponent {
     this.propertiesByCardId.update((current) => ({
       ...current,
       [cardId]: (current[cardId] ?? []).map((item, itemIndex) =>
-        itemIndex === index && !item.cardIds.includes(relCardId)
-          ? { ...item, cardIds: [...item.cardIds, relCardId] }
+        itemIndex === index && !item.targets.some(t => t.targetCardId === relCardId)
+          ? { ...item, targets: [...item.targets, { targetCardId: relCardId }] }
           : item
       ),
     }));
+    this.saveRelationshipsSubject.next(cardId);
   }
 
   removePropertyCard(cardId: number, index: number, relCardId: number): void {
@@ -2195,10 +2276,11 @@ export class WorldDetailPageComponent {
       ...current,
       [cardId]: (current[cardId] ?? []).map((item, itemIndex) =>
         itemIndex === index
-          ? { ...item, cardIds: item.cardIds.filter(id => id !== relCardId) }
+          ? { ...item, targets: item.targets.filter(t => t.targetCardId !== relCardId) }
           : item
       ),
     }));
+    this.saveRelationshipsSubject.next(cardId);
   }
 
   openCard(cardId: number): void {

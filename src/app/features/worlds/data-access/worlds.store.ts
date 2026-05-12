@@ -1,8 +1,9 @@
 import { Injectable, signal, inject, computed } from '@angular/core';
 import { catchError, tap } from 'rxjs';
 import { World } from '../models/world.model';
-import { WorldCard } from '../models/world-card.model';
+import { WorldCard, CardSection } from '../models/world-card.model';
 import { CardType } from '../models/card-type.model';
+import { CardRelationship } from '../models/card-relationship.model';
 import { ApiService } from '../../../core/services/api.service';
 
 @Injectable({
@@ -147,6 +148,7 @@ export class WorldsStore {
             ...card,
             cardName: rawName,
             sections: card.sections ?? fallback?.sections ?? [],
+            relationships: card.relationships ?? fallback?.relationships ?? [],
             createdAtLabel: card.createdAtLabel ?? fallback?.createdAtLabel ?? this.formatToday(),
         };
     }
@@ -262,6 +264,18 @@ export class WorldsStore {
             }),
             catchError((error) => {
                 console.error('Erro ao salvar seções do card:', error);
+                throw error;
+            })
+        );
+    }
+
+    saveCardRelationships(worldId: number, cardId: number, relationships: CardRelationship[]) {
+        return this.apiService.put<WorldCard>(`/worlds/${worldId}/cards/${cardId}/relationships`, { relationships }).pipe(
+            tap((updatedCard) => {
+                this.updateCardInList(worldId, updatedCard);
+            }),
+            catchError((error) => {
+                console.error('Erro ao salvar propriedades do card:', error);
                 throw error;
             })
         );
