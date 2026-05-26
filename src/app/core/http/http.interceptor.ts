@@ -6,7 +6,11 @@ import { AuthService } from '../services/auth.service';
 import { environment } from '../../../environments/environment';
 
 function isInternalApiRequest(url: string): boolean {
-    if (url.startsWith('/')) {
+    if (url.startsWith(environment.apiUrl)) {
+        return true;
+    }
+
+    if (url.startsWith('/') && environment.apiUrl.startsWith('/')) {
         return url.startsWith(environment.apiUrl);
     }
 
@@ -16,8 +20,16 @@ function isInternalApiRequest(url: string): boolean {
             return false;
         }
 
+        const apiOrigin = environment.apiUrl.startsWith('http')
+            ? new URL(environment.apiUrl).origin
+            : currentOrigin;
+
+        const apiPath = environment.apiUrl.startsWith('http')
+            ? new URL(environment.apiUrl).pathname
+            : environment.apiUrl;
+
         const parsedUrl = new URL(url, currentOrigin);
-        return parsedUrl.origin === currentOrigin && parsedUrl.pathname.startsWith(environment.apiUrl);
+        return parsedUrl.origin === apiOrigin && parsedUrl.pathname.startsWith(apiPath);
     } catch {
         return false;
     }
