@@ -35,7 +35,7 @@ function runtimeValue(name: string): string {
 
 export const environment: AppEnvironment = {
   production: ${isProduction},
-  apiUrl: '/api',
+  apiUrl: runtimeValue('${prefix}_API_URL') || '/api',
   firebase: {
     apiKey: runtimeValue('${prefix}_FIREBASE_API_KEY'),
     authDomain: runtimeValue('${prefix}_FIREBASE_AUTH_DOMAIN'),
@@ -51,6 +51,7 @@ export const environment: AppEnvironment = {
 
 function runtimeEnvFileContent() {
   const keys = [
+    'DEV_API_URL',
     'DEV_FIREBASE_API_KEY',
     'DEV_FIREBASE_AUTH_DOMAIN',
     'DEV_FIREBASE_PROJECT_ID',
@@ -58,6 +59,7 @@ function runtimeEnvFileContent() {
     'DEV_FIREBASE_MESSAGING_SENDER_ID',
     'DEV_FIREBASE_APP_ID',
     'DEV_FIREBASE_MEASUREMENT_ID',
+    'PROD_API_URL',
     'PROD_FIREBASE_API_KEY',
     'PROD_FIREBASE_AUTH_DOMAIN',
     'PROD_FIREBASE_PROJECT_ID',

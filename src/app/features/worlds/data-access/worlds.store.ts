@@ -16,6 +16,7 @@ export class WorldsStore {
     readonly isLoading = signal(false);
     readonly error = signal<string | null>(null);
     readonly cardsByWorld = signal<Record<number, WorldCard[]>>({});
+    readonly isLoadingCards = signal(false);
     readonly cardTypes = signal<CardType[]>([]);
     readonly isLoadingCardTypes = signal(false);
 
@@ -64,15 +65,18 @@ export class WorldsStore {
     }
 
     loadCardsByWorldId(worldId: number): void {
+        this.isLoadingCards.set(true);
         this.apiService.get<WorldCard[]>(`/worlds/${worldId}/cards`).subscribe({
             next: (cards) => {
                 this.cardsByWorld.update((current) => ({
                     ...current,
                     [worldId]: cards.map((card) => this.normalizeCard(card)),
                 }));
+                this.isLoadingCards.set(false);
             },
             error: (error) => {
                 console.error(`Erro ao carregar cartas do mundo ${worldId}:`, error);
+                this.isLoadingCards.set(false);
             },
         });
     }

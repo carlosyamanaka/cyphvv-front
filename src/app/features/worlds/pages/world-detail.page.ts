@@ -3,7 +3,7 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { map, Subject, debounceTime, tap } from 'rxjs';
-import { LucideAngularModule, Ghost, ScrollText, User, Calendar, Shield, Map as MapIcon, Users, Eye, Crosshair, Star, MapPin, Crown, BookOpen, Sun, Book, FileQuestion, AlignLeft, Type, Trash2, ChevronDown } from 'lucide-angular';
+import { LucideAngularModule, Ghost, ScrollText, User, Calendar, Shield, Map as MapIcon, Users, Eye, Crosshair, Star, MapPin, Crown, BookOpen, Sun, Book, FileQuestion, AlignLeft, Type, Trash2, ChevronDown, Loader2 } from 'lucide-angular';
 import { WorldsStore } from '../data-access/worlds.store';
 import { WorldCard } from '../models/world-card.model';
 import { CardRelationship, CardRelationshipTarget } from '../models/card-relationship.model';
@@ -68,11 +68,17 @@ const CREATE_CARD_TYPE_OPTION_VALUE = '__create_new_card_type__';
                       <p class="tree-item-date">{{ card.createdAtLabel }}</p>
                     </button>
                   } @empty {
-                <div class="tree-empty-state">
-                  <lucide-icon [img]="GhostIcon" [size]="32" class="tree-empty-icon" strokeWidth="1.5"></lucide-icon>
-                  <p class="tree-empty-text">Nenhuma nota por aqui ainda...</p>
-                </div>
-              }
+                    @if (isLoadingCards()) {
+                      <div class="tree-empty-state">
+                        <lucide-icon [img]="Loader2Icon" [size]="32" class="tree-empty-icon spin-icon" strokeWidth="1.5"></lucide-icon>
+                      </div>
+                    } @else {
+                      <div class="tree-empty-state">
+                        <lucide-icon [img]="GhostIcon" [size]="32" class="tree-empty-icon" strokeWidth="1.5"></lucide-icon>
+                        <p class="tree-empty-text">Nenhuma nota por aqui ainda...</p>
+                      </div>
+                    }
+                  }
                 </div>
               </section>
 
@@ -728,6 +734,14 @@ const CREATE_CARD_TYPE_OPTION_VALUE = '__create_new_card_type__';
       font-size: 0.8rem;
       line-height: 1.4;
       text-align: center;
+    }
+
+    .spin-icon {
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      100% { transform: rotate(360deg); }
     }
 
     .vault-editor {
@@ -1736,6 +1750,7 @@ export class WorldDetailPageComponent {
   readonly FileQuestionIcon = FileQuestion;
   readonly TrashIcon = Trash2;
   readonly ChevronDownIcon = ChevronDown;
+  readonly Loader2Icon = Loader2;
 
   private readonly iconMap: Record<string, any> = {
     'user': User,
@@ -1817,6 +1832,7 @@ export class WorldDetailPageComponent {
   readonly cards = computed(() => this.worldsStore.getCardsByWorldId(this.routeWorldId()));
   readonly cardTypes = computed(() => this.worldsStore.getCardTypes().filter((type) => !type.deleted));
   readonly isLoadingCardTypes = computed(() => this.worldsStore.isLoadingCardTypes());
+  readonly isLoadingCards = computed(() => this.worldsStore.isLoadingCards());
   readonly isCreatingCardFromType = signal(false);
   readonly isNewCardModalOpen = signal(false);
   readonly isCreatingCardType = signal(false);
@@ -1967,7 +1983,13 @@ export class WorldDetailPageComponent {
                 ...current,
                 [card.id]: current[card.id].map(p => {
                   if (p.typeId !== null) return p;
-                  const type = this.cardTypes().find(t => t.cardTypeName === p.key);
+                  let type = this.cardTypes().find(t => t.cardTypeName === p.key);
+                  if (!type && p.targets && p.targets.length > 0) {
+                    const targetCard = this.cards().find(c => c.id === p.targets[0].targetCardId);
+                    if (targetCard) {
+                      type = this.cardTypes().find(t => t.id === targetCard.cardTypeId);
+                    }
+                  }
                   return type ? { ...p, typeId: type.id } : p;
                 })
               };
@@ -1977,7 +1999,14 @@ export class WorldDetailPageComponent {
           
           const relationships = card.relationships ?? [];
           const drafts: CardPropertyDraft[] = relationships.map(rel => {
-            const type = this.cardTypes().find(t => t.cardTypeName === rel.name);
+            let type = this.cardTypes().find(t => t.cardTypeName === rel.name);
+            if (!type && rel.targets && rel.targets.length > 0) {
+              const targetCard = this.cards().find(c => c.id === rel.targets[0].targetCardId);
+              if (targetCard) {
+                type = this.cardTypes().find(t => t.id === targetCard.cardTypeId);
+              }
+            }
+            
             return {
               id: rel.id,
               typeId: type ? type.id : null,
@@ -2121,8 +2150,25 @@ export class WorldDetailPageComponent {
     }));
 
     this.worldsStore.saveCardRelationships(worldId, cardId, relationships).subscribe({
-      next: () => {
+      next: (updatedCard) => {
         this.isSavingRelationships.update(current => ({ ...current, [cardId]: false }));
+        
+        if (updatedCard.relationships) {
+          this.propertiesByCardId.update(current => {
+            const drafts = current[cardId];
+            if (!drafts) return current;
+            
+            const updatedDrafts = drafts.map((draft, idx) => {
+              const backRel = updatedCard.relationships![idx];
+              if (backRel && backRel.id !== draft.id) {
+                return { ...draft, id: backRel.id };
+              }
+              return draft;
+            });
+            
+            return { ...current, [cardId]: updatedDrafts };
+          });
+        }
       },
       error: () => {
         this.isSavingRelationships.update(current => ({ ...current, [cardId]: false }));

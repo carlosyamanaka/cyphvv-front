@@ -19,7 +19,7 @@ function runtimeValue(name: string): string {
 
 export const environment: AppEnvironment = {
   production: false,
-  apiUrl: '/api',
+  apiUrl: runtimeValue('DEV_API_URL') || '/api',
   firebase: {
     apiKey: runtimeValue('DEV_FIREBASE_API_KEY'),
     authDomain: runtimeValue('DEV_FIREBASE_AUTH_DOMAIN'),

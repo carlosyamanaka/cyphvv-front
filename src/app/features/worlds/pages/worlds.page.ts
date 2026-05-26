@@ -1,11 +1,12 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { LucideAngularModule, Loader2 } from 'lucide-angular';
 import { WorldsStore } from '../data-access/worlds.store';
 
 @Component({
   selector: 'app-worlds-page',
-  imports: [ReactiveFormsModule],
+  imports: [ReactiveFormsModule, LucideAngularModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section class="worlds-page">
@@ -14,26 +15,34 @@ import { WorldsStore } from '../data-access/worlds.store';
         <p class="panel-subtitle">Escolha um mundo para continuar.</p>
 
         <div class="world-list">
-        @for (world of worlds(); track world.id) {
-            <article class="world-card">
-            <button
-              type="button"
-              class="world-button"
-              (click)="openWorld(world.id)"
-              [attr.aria-label]="'Abrir mundo ' + world.name"
-            >
-                <p class="world-date">Atualizado {{ world.createdAtLabel }}</p>
-              <h2>{{ world.name }}</h2>
-              <p>{{ world.summary }}</p>
-            </button>
-          </article>
-        } @empty {
+        @if (isLoading()) {
           <article class="world-card empty">
             <div class="empty-content">
-                <h2>Nenhum mundo ainda</h2>
-                <p>Clique em "Criar novo mundo" para iniciar o primeiro.</p>
+                <lucide-icon [img]="Loader2Icon" [size]="40" class="spin-icon" strokeWidth="1.5" color="#c6d2ff"></lucide-icon>
             </div>
           </article>
+        } @else {
+          @for (world of worlds(); track world.id) {
+              <article class="world-card">
+              <button
+                type="button"
+                class="world-button"
+                (click)="openWorld(world.id)"
+                [attr.aria-label]="'Abrir mundo ' + world.name"
+              >
+                  <p class="world-date">Atualizado {{ world.createdAtLabel }}</p>
+                <h2>{{ world.name }}</h2>
+                <p>{{ world.summary }}</p>
+              </button>
+            </article>
+          } @empty {
+            <article class="world-card empty">
+              <div class="empty-content">
+                  <h2>Nenhum mundo ainda</h2>
+                  <p>Clique em "Criar novo mundo" para iniciar o primeiro.</p>
+              </div>
+            </article>
+          }
         }
         </div>
 
@@ -302,6 +311,14 @@ import { WorldsStore } from '../data-access/worlds.store';
       max-width: 32ch;
     }
 
+    .spin-icon {
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      100% { transform: rotate(360deg); }
+    }
+
     .dialog-overlay {
       position: fixed;
       inset: 0;
@@ -390,11 +407,13 @@ import { WorldsStore } from '../data-access/worlds.store';
   `,
 })
 export class WorldsPageComponent {
+  readonly Loader2Icon = Loader2;
   private readonly worldsStore = inject(WorldsStore);
   private readonly router = inject(Router);
   private readonly formBuilder = inject(FormBuilder);
 
   readonly worlds = this.worldsStore.worlds;
+  readonly isLoading = this.worldsStore.isLoading;
   readonly isCreateDialogOpen = signal(false);
   readonly isCreatingWorld = signal(false);
   readonly createWorldForm = this.formBuilder.nonNullable.group({
