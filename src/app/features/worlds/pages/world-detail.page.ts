@@ -57,16 +57,28 @@ const CREATE_CARD_TYPE_OPTION_VALUE = '__create_new_card_type__';
 
                 <div class="tree-list">
                   @for (card of filteredCards(); track card.id) {
-                    <button
-                      type="button"
+                    <div
                       class="tree-item"
                       [class.is-active]="isVisibleCard(card.id)"
-                      (click)="openCard(card.id)"
-                      [attr.aria-label]="'Abrir card ' + card.cardName"
                     >
-                      <p class="tree-item-title">{{ card.cardName }}</p>
-                      <p class="tree-item-date">{{ card.createdAtLabel }}</p>
-                    </button>
+                      <div
+                        class="tree-item-content"
+                        (click)="openCard(card.id)"
+                        [attr.aria-label]="'Abrir card ' + card.cardName"
+                      >
+                        <p class="tree-item-title">{{ card.cardName }}</p>
+                        <p class="tree-item-date">{{ card.createdAtLabel }}</p>
+                      </div>
+
+                      <button
+                        type="button"
+                        class="tree-item-delete-btn"
+                        (click)="confirmDeleteCard(card.id); $event.stopPropagation()"
+                        aria-label="Excluir card"
+                      >
+                        <lucide-icon [img]="TrashIcon" [size]="14"></lucide-icon>
+                      </button>
+                    </div>
                   } @empty {
                     @if (isLoadingCards()) {
                       <div class="tree-empty-state">
@@ -348,84 +360,121 @@ const CREATE_CARD_TYPE_OPTION_VALUE = '__create_new_card_type__';
     </section>
 
     @if (isNewCardModalOpen()) {
-      <div class="modal-backdrop" (click)="closeNewCardModal()">
-        <section class="new-card-modal" aria-label="Selecionar tipo do card" (click)="$event.stopPropagation()">
-          <div class="new-card-modal-head">
-            <h3>Novo cartao</h3>
-            <button type="button" class="icon-action modal-close" aria-label="Fechar janela" (click)="closeNewCardModal()">x</button>
-          </div>
-          
-          @if (!isCreateTypePopoverOpen()) {
-            
-            <input
-              type="search"
-              class="search-input"
-              placeholder="Buscar tipos..."
-              [value]="cardTypeSearchTerm()"
-              (input)="onCardTypeSearchInput($event)"
-            />
+      <div class="dialog-overlay" (click)="closeNewCardModal()" aria-hidden="true"></div>
+      <section class="dialog new-card-modal-dialog" role="dialog" aria-modal="true" aria-label="Novo Cartão">
+        <div class="new-card-modal-head">
+          <h3>Novo cartão</h3>
+          <button type="button" class="icon-action modal-close" aria-label="Fechar janela" (click)="closeNewCardModal()">x</button>
+        </div>
+        
+        @if (!isCreateTypePopoverOpen()) {
+          <input
+            type="search"
+            class="search-input"
+            placeholder="Buscar tipos..."
+            [value]="cardTypeSearchTerm()"
+            (input)="onCardTypeSearchInput($event)"
+          />
 
-            <div class="new-card-type-grid">
-              @for (type of filteredCardTypes(); track type.id) {
-                <button
-                  type="button"
-                  class="new-card-type-option"
-                  [disabled]="isCreatingCardFromType()"
-                  (click)="createCardFromType(type.id)"
-                >
-                  <lucide-icon [img]="getIcon(type.iconType)" [size]="16" strokeWidth="2"></lucide-icon>
-                  {{ type.cardTypeName }}
-                </button>
-              } @empty {
-                @if (cardTypes().length === 0) {
-                  <p class="tree-empty" style="grid-column: span 2">Nenhum tipo de card disponivel.</p>
-                }
-              }
-              
+          <div class="new-card-type-grid">
+            @for (type of filteredCardTypes(); track type.id) {
               <button
                 type="button"
-                class="new-card-type-option add-new-type"
-                (click)="openCreateCardTypePopover()"
+                class="new-card-type-option"
+                [disabled]="isCreatingCardFromType()"
+                (click)="createCardFromType(type.id)"
               >
-                + Adicionar novo tipo
+                <lucide-icon [img]="getIcon(type.iconType)" [size]="16" strokeWidth="2"></lucide-icon>
+                {{ type.cardTypeName }}
+              </button>
+            } @empty {
+              @if (cardTypes().length === 0) {
+                <p class="tree-empty" style="grid-column: span 2">Nenhum tipo de card disponivel.</p>
+              }
+            }
+            
+            <button
+              type="button"
+              class="new-card-type-option add-new-type"
+              (click)="openCreateCardTypePopover()"
+            >
+              + Adicionar novo tipo
+            </button>
+          </div>
+        } @else {
+          <div class="create-type-form">
+            <p class="field-hint">Digite o nome do novo tipo.</p>
+            <input
+              type="text"
+              class="search-input"
+              placeholder="Nome do tipo"
+              [value]="newCardTypeName()"
+              (input)="onNewCardTypeNameInput($event)"
+              (keyup.enter)="submitCreateCardType()"
+              autofocus
+            />
+            
+            <p class="field-hint" style="margin-top: 0.4rem; margin-bottom: 0.2rem;">Escolha um ícone:</p>
+            <div class="icon-selector-grid" role="group" aria-label="Seletor de ícone">
+              @for (iconKey of availableIcons; track iconKey) {
+                <button
+                  type="button"
+                  class="icon-selector-option"
+                  [class.is-selected]="newCardIconType() === iconKey"
+                  (click)="selectIcon(iconKey)"
+                  [attr.aria-label]="'Selecionar ícone ' + iconKey"
+                  [title]="iconKey"
+                >
+                  <lucide-icon [img]="getIcon(iconKey)" [size]="20" strokeWidth="2.5"></lucide-icon>
+                </button>
+              }
+            </div>
+
+            <div class="popover-actions">
+              <button type="button" class="secondary-action" (click)="cancelCreateCardType()">Cancelar</button>
+              <button 
+                type="button" 
+                class="save-button" 
+                [disabled]="isCreatingCardType() || !newCardTypeName().trim()"
+                (click)="submitCreateCardType()"
+              >
+                Salvar
               </button>
             </div>
-          } @else {
-            <div class="create-type-form">
-              <p class="field-hint">Digite o nome do novo tipo.</p>
-              <input
-                type="text"
-                class="search-input"
-                placeholder="Nome do tipo"
-                [value]="newCardTypeName()"
-                (input)="onNewCardTypeNameInput($event)"
-                autofocus
-              />
-              <input
-                type="text"
-                class="search-input"
-                placeholder="Nome do ícone (ex: star, user, tag)"
-                [value]="newCardIconType()"
-                (input)="onNewCardIconTypeInput($event)"
-                (keyup.enter)="submitCreateCardType()"
-              />
-              <div class="popover-actions">
-                <button type="button" class="secondary-action" (click)="cancelCreateCardType()">Cancelar</button>
-                <button 
-                  type="button" 
-                  class="save-button" 
-                  [disabled]="isCreatingCardType() || !newCardTypeName().trim()"
-                  (click)="submitCreateCardType()"
-                >
-                  Salvar
-                </button>
-              </div>
-            </div>
-          }
-        </section>
-      </div>
+          </div>
+        }
+      </section>
     }
 
+    @if (cardToDeleteId() !== null) {
+      <div class="dialog-overlay" (click)="cancelDeleteCard()" aria-hidden="true"></div>
+      <section class="dialog delete-confirm-modal" role="dialog" aria-modal="true" aria-label="Confirmar exclusão">
+        <div class="new-card-modal-head">
+          <h3>Confirmar Exclusão</h3>
+          <button type="button" class="icon-action modal-close" aria-label="Fechar janela" (click)="cancelDeleteCard()">x</button>
+        </div>
+        <div class="delete-confirm-content" style="padding: 0.5rem 0;">
+          <p style="margin: 0; color: var(--color-text-primary); font-size: 0.9rem;">Você tem certeza que deseja excluir o cartão <strong>"{{ getCardName(cardToDeleteId()!) }}"</strong>?</p>
+          <p class="field-hint" style="color: #ff5f5f; margin-top: 0.5rem;">Esta ação não pode ser desfeita.</p>
+        </div>
+        <div class="popover-actions">
+          <button type="button" class="secondary-action" (click)="cancelDeleteCard()">Cancelar</button>
+          <button 
+            type="button" 
+            class="save-button delete-confirm-button" 
+            [disabled]="isDeletingCard()"
+            (click)="executeDeleteCard()"
+            style="background: linear-gradient(135deg, #d32f2f 0%, #b71c1c 100%);"
+          >
+            @if (isDeletingCard()) {
+              Excluindo...
+            } @else {
+              Excluir
+            }
+          </button>
+        </div>
+      </section>
+    }
   `,
   styles: `
     .vault-page {
@@ -679,14 +728,15 @@ const CREATE_CARD_TYPE_OPTION_VALUE = '__create_new_card_type__';
     }
 
     .tree-item {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
       border-radius: 0.5rem;
       background: rgba(28, 29, 35, 0.8);
-      padding: 0.45rem 0.5rem;
-      text-align: left;
-      cursor: pointer;
       transition: transform 0.15s ease, box-shadow 0.15s ease;
-      border: none;
       box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+      overflow: visible;
     }
 
     .tree-item:hover {
@@ -694,13 +744,39 @@ const CREATE_CARD_TYPE_OPTION_VALUE = '__create_new_card_type__';
     }
 
     .tree-item.is-active {
-      border-color: transparent;
       box-shadow: inset 0 0 0 2px rgba(102, 169, 255, 0.4), 0 2px 8px rgba(102, 169, 255, 0.12);
     }
 
-    .tree-item:focus-visible {
-      outline: 2px solid var(--color-focus-ring);
-      outline-offset: 1px;
+    .tree-item-content {
+      flex: 1;
+      padding: 0.45rem 0.5rem;
+      text-align: left;
+      cursor: pointer;
+      min-width: 0;
+    }
+
+    .tree-item-delete-btn {
+      background: transparent;
+      border: none;
+      color: #ff5f5f;
+      cursor: pointer;
+      padding: 0.3rem 0.5rem;
+      border-radius: 0.35rem;
+      opacity: 0;
+      transition: opacity 0.2s, background-color 0.2s, color 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-right: 0.35rem;
+    }
+
+    .tree-item:hover .tree-item-delete-btn {
+      opacity: 1;
+    }
+
+    .tree-item-delete-btn:hover {
+      background: rgba(255, 68, 68, 0.12);
+      color: #ff3333;
     }
 
     .tree-item-title {
@@ -1190,26 +1266,42 @@ const CREATE_CARD_TYPE_OPTION_VALUE = '__create_new_card_type__';
       font-size: 0.76rem;
     }
 
-    .modal-backdrop {
+    .dialog-overlay {
       position: fixed;
       inset: 0;
-      z-index: 40;
-      background: rgba(5, 7, 12, 0.62);
+      background: rgba(5, 8, 17, 0.55);
       backdrop-filter: blur(6px);
-      display: grid;
-      place-items: center;
-      padding: 1rem;
+      z-index: 9999;
     }
 
-    .new-card-modal {
+    .dialog {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-lg);
+      z-index: 10000;
+      box-sizing: border-box;
+    }
+
+    .new-card-modal-dialog {
       width: min(100%, 420px);
-      border-radius: 0.9rem;
       background: linear-gradient(180deg, rgba(22, 25, 35, 0.98) 0%, rgba(16, 18, 27, 0.98) 100%);
       border: 1px solid rgba(255, 255, 255, 0.12);
       box-shadow: 0 20px 60px rgba(0, 0, 0, 0.42);
       padding: 0.95rem;
       display: grid;
       gap: 0.7rem;
+    }
+
+    .delete-confirm-modal {
+      width: min(92vw, 28rem);
+      background: linear-gradient(165deg, #121831 0%, #0b1329 100%);
+      border: 1px solid rgba(162, 176, 235, 0.22);
+      padding: 1.2rem;
+      display: grid;
+      gap: 0.8rem;
     }
 
     .new-card-modal-head {
@@ -1279,6 +1371,46 @@ const CREATE_CARD_TYPE_OPTION_VALUE = '__create_new_card_type__';
     .create-type-form {
       display: grid;
       gap: 0.8rem;
+    }
+
+    .icon-selector-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 0.5rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .icon-selector-option {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0.6rem;
+      border-radius: 0.5rem;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      background: rgba(255, 255, 255, 0.02);
+      color: var(--color-text-secondary);
+      cursor: pointer;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      outline: none;
+    }
+
+    .icon-selector-option:hover {
+      background: rgba(255, 255, 255, 0.08);
+      border-color: rgba(255, 255, 255, 0.25);
+      color: var(--color-text-primary);
+      transform: translateY(-1px);
+    }
+
+    .icon-selector-option.is-selected {
+      background: var(--color-bg-soft-blue);
+      border-color: var(--color-brand-blue);
+      color: var(--color-brand-blue);
+      box-shadow: 0 0 12px rgba(102, 169, 255, 0.25);
+    }
+
+    .icon-selector-option:focus-visible {
+      outline: 2px solid var(--color-focus-ring);
+      outline-offset: 1px;
     }
 
     .property-list {
@@ -1827,6 +1959,7 @@ export class WorldDetailPageComponent {
     if (!target.closest('.section-head')) {
       this.activePropertyPopoverCardId.set(null);
     }
+
   }
 
   readonly cards = computed(() => this.worldsStore.getCardsByWorldId(this.routeWorldId()));
@@ -1838,7 +1971,24 @@ export class WorldDetailPageComponent {
   readonly isCreatingCardType = signal(false);
   readonly isCreateTypePopoverOpen = signal(false);
   readonly newCardTypeName = signal('');
-  readonly newCardIconType = signal('');
+  readonly newCardIconType = signal('star');
+  readonly availableIcons = [
+    'star',
+    'user',
+    'users',
+    'shield',
+    'map',
+    'map-pin',
+    'calendar',
+    'eye',
+    'crosshair',
+    'crown',
+    'book-open',
+    'book',
+    'sun',
+    'ghost',
+    'scroll-text'
+  ];
   readonly createCardTypeOptionValue = CREATE_CARD_TYPE_OPTION_VALUE;
   readonly cardTypeNameByCardId = signal<Record<number, string>>({});
   readonly cardNameDraftByCardId = signal<Record<number, string>>({});
@@ -1857,6 +2007,8 @@ export class WorldDetailPageComponent {
   readonly activePropertyPopoverCardId = signal<number | null>(null);
   readonly renamingPropertyId = signal<string | null>(null);
   readonly activeCardSelectPopoverId = signal<string | null>(null);
+  readonly cardToDeleteId = signal<number | null>(null);
+  readonly isDeletingCard = signal(false);
 
   readonly filteredCards = computed(() => {
     const query = this.searchTerm().trim().toLowerCase();
@@ -2449,15 +2601,14 @@ export class WorldDetailPageComponent {
     this.newCardTypeName.set(target?.value ?? '');
   }
 
-  onNewCardIconTypeInput(event: Event): void {
-    const target = event.target as HTMLInputElement | null;
-    this.newCardIconType.set(target?.value ?? '');
+  selectIcon(iconKey: string): void {
+    this.newCardIconType.set(iconKey);
   }
 
   cancelCreateCardType(): void {
     this.isCreateTypePopoverOpen.set(false);
     this.newCardTypeName.set('');
-    this.newCardIconType.set('');
+    this.newCardIconType.set('star');
     this.cardForm.patchValue({ cardTypeId: null });
   }
 
@@ -2485,7 +2636,7 @@ export class WorldDetailPageComponent {
         this.cardForm.patchValue({ cardTypeId: null });
         this.isCreateTypePopoverOpen.set(false);
         this.newCardTypeName.set('');
-        this.newCardIconType.set('');
+        this.newCardIconType.set('star');
         this.isCreatingCardType.set(false);
       },
       error: () => {
@@ -2497,7 +2648,43 @@ export class WorldDetailPageComponent {
 
   openCreateCardTypePopover(): void {
     this.cardForm.patchValue({ cardTypeId: null });
+    this.newCardIconType.set('star');
     this.isCreateTypePopoverOpen.set(true);
+  }
+
+  confirmDeleteCard(cardId: number): void {
+    this.cardToDeleteId.set(cardId);
+  }
+
+  cancelDeleteCard(): void {
+    this.cardToDeleteId.set(null);
+  }
+
+  executeDeleteCard(): void {
+    const cardId = this.cardToDeleteId();
+    const worldId = this.routeWorldId();
+    if (!cardId || worldId <= 0) return;
+
+    this.isDeletingCard.set(true);
+    this.worldsStore.deleteCard(worldId, cardId).subscribe({
+      next: () => {
+        // If the card is currently open in the panels, close it
+        this.closeCard(cardId);
+        
+        // Clean up component local maps
+        this.cardTypeNameByCardId.update(current => { const next = { ...current }; delete next[cardId]; return next; });
+        this.cardNameDraftByCardId.update(current => { const next = { ...current }; delete next[cardId]; return next; });
+        this.aliasesByCardId.update(current => { const next = { ...current }; delete next[cardId]; return next; });
+        this.propertiesByCardId.update(current => { const next = { ...current }; delete next[cardId]; return next; });
+        this.sectionsByCardId.update(current => { const next = { ...current }; delete next[cardId]; return next; });
+
+        this.isDeletingCard.set(false);
+        this.cardToDeleteId.set(null);
+      },
+      error: () => {
+        this.isDeletingCard.set(false);
+      }
+    });
   }
 
 

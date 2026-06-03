@@ -285,6 +285,45 @@ export class WorldsStore {
         );
     }
 
+    deleteCard(worldId: number, cardId: number) {
+        return this.apiService.delete<void>(`/worlds/${worldId}/cards/${cardId}`).pipe(
+            tap(() => {
+                this.cardsByWorld.update((current) => {
+                    const cards = current[worldId] ?? [];
+                    return {
+                        ...current,
+                        [worldId]: cards.filter((card) => card.id !== cardId),
+                    };
+                });
+            }),
+            catchError((error) => {
+                console.error('Erro ao deletar card:', error);
+                this.error.set('Erro ao deletar card. Por favor, tente novamente.');
+                throw error;
+            })
+        );
+    }
+
+    deleteWorld(worldId: number) {
+        return this.apiService.delete<void>(`/worlds/${worldId}`).pipe(
+            tap(() => {
+                this.worlds.update((currentWorlds) =>
+                    currentWorlds.filter((world) => world.id !== worldId)
+                );
+                this.cardsByWorld.update((current) => {
+                    const next = { ...current };
+                    delete next[worldId];
+                    return next;
+                });
+            }),
+            catchError((error) => {
+                console.error('Erro ao deletar mundo:', error);
+                this.error.set('Erro ao deletar mundo. Por favor, tente novamente.');
+                throw error;
+            })
+        );
+    }
+
     private updateCardInList(worldId: number, updatedCard: WorldCard) {
         this.cardsByWorld.update((current) => {
             const cards = current[worldId] ?? [];

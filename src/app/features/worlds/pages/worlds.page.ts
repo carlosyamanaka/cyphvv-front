@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { LucideAngularModule, Loader2 } from 'lucide-angular';
+import { LucideAngularModule, Loader2, Trash2 } from 'lucide-angular';
 import { WorldsStore } from '../data-access/worlds.store';
 
 @Component({
@@ -23,16 +23,32 @@ import { WorldsStore } from '../data-access/worlds.store';
           </article>
         } @else {
           @for (world of worlds(); track world.id) {
-              <article class="world-card">
+              <article class="world-card" [class.is-card-deleting]="deletingWorldId() === world.id">
               <button
                 type="button"
                 class="world-button"
+                [disabled]="deletingWorldId() !== null"
                 (click)="openWorld(world.id)"
                 [attr.aria-label]="'Abrir mundo ' + world.name"
               >
                   <p class="world-date">Atualizado {{ world.createdAtLabel }}</p>
                 <h2>{{ world.name }}</h2>
                 <p>{{ world.summary }}</p>
+              </button>
+
+              <button
+                type="button"
+                class="world-delete-btn"
+                [class.is-deleting]="deletingWorldId() === world.id"
+                [disabled]="deletingWorldId() !== null"
+                (click)="confirmDeleteWorld($event, world.id)"
+                aria-label="Excluir mundo"
+              >
+                @if (deletingWorldId() === world.id) {
+                  <lucide-icon [img]="Loader2Icon" [size]="16" class="spin-icon"></lucide-icon>
+                } @else {
+                  <lucide-icon [img]="TrashIcon" [size]="16"></lucide-icon>
+                }
               </button>
             </article>
           } @empty {
@@ -84,6 +100,34 @@ import { WorldsStore } from '../data-access/worlds.store';
               </button>
             </div>
           </form>
+        </section>
+      }
+
+      @if (worldToDeleteId() !== null) {
+        <div class="dialog-overlay" (click)="cancelDeleteWorld()" aria-hidden="true"></div>
+        <section class="dialog" role="dialog" aria-modal="true" aria-labelledby="delete-world-title">
+          <h2 id="delete-world-title">Confirmar Exclusão</h2>
+          <p>Você tem certeza que deseja excluir o mundo <strong>"{{ getWorldName(worldToDeleteId()!) }}"</strong>?</p>
+          <p class="field-error" style="color: #ff5f5f; margin-top: 0.5rem;">Esta ação excluirá permanentemente todos os cartões e dados vinculados a este mundo.</p>
+
+          <div class="dialog-actions" style="margin-top: 1rem;">
+            <button type="button" class="secondary-button" (click)="cancelDeleteWorld()">
+              Cancelar
+            </button>
+            <button
+              type="button"
+              class="create-button"
+              [disabled]="deletingWorldId() !== null"
+              (click)="executeDeleteWorld()"
+              style="background: linear-gradient(135deg, #d32f2f 0%, #b71c1c 100%); color: #ffffff;"
+            >
+              @if (deletingWorldId() !== null) {
+                Excluindo...
+              } @else {
+                Excluir
+              }
+            </button>
+          </div>
         </section>
       }
     </section>
@@ -212,12 +256,19 @@ import { WorldsStore } from '../data-access/worlds.store';
     }
 
     .world-card {
+      position: relative;
       border: 1px solid rgba(145, 158, 212, 0.2);
       border-radius: 0.8rem;
       background: rgba(7, 12, 24, 0.5);
       display: flex;
       overflow: hidden;
       min-width: 0;
+      transition: opacity 0.2s ease;
+    }
+
+    .world-card.is-card-deleting {
+      opacity: 0.5;
+      pointer-events: none;
     }
 
     .world-button {
@@ -235,6 +286,45 @@ import { WorldsStore } from '../data-access/worlds.store';
       cursor: pointer;
       transition: transform 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
       min-width: 0;
+    }
+
+    .world-button:disabled {
+      cursor: not-allowed;
+      opacity: 0.7;
+    }
+
+    .world-delete-btn {
+      position: absolute;
+      top: 0.8rem;
+      right: 0.8rem;
+      background: rgba(7, 12, 24, 0.6);
+      border: 1px solid rgba(255, 95, 95, 0.3);
+      color: #ff5f5f;
+      cursor: pointer;
+      padding: 0.4rem;
+      border-radius: 50%;
+      opacity: 0;
+      transition: opacity 0.2s, background-color 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 10;
+    }
+
+    .world-card:hover .world-delete-btn,
+    .world-delete-btn.is-deleting {
+      opacity: 1;
+    }
+
+    .world-delete-btn:hover {
+      background: rgba(255, 68, 68, 0.15);
+      color: #ff3333;
+      border-color: rgba(255, 51, 51, 0.5);
+    }
+
+    .world-delete-btn:disabled {
+      cursor: not-allowed;
+      opacity: 0.5;
     }
 
     .world-button:hover {
@@ -408,6 +498,7 @@ import { WorldsStore } from '../data-access/worlds.store';
 })
 export class WorldsPageComponent {
   readonly Loader2Icon = Loader2;
+  readonly TrashIcon = Trash2;
   private readonly worldsStore = inject(WorldsStore);
   private readonly router = inject(Router);
   private readonly formBuilder = inject(FormBuilder);
@@ -416,6 +507,8 @@ export class WorldsPageComponent {
   readonly isLoading = this.worldsStore.isLoading;
   readonly isCreateDialogOpen = signal(false);
   readonly isCreatingWorld = signal(false);
+  readonly worldToDeleteId = signal<number | null>(null);
+  readonly deletingWorldId = signal<number | null>(null);
   readonly createWorldForm = this.formBuilder.nonNullable.group({
     worldName: ['', [Validators.required, Validators.minLength(2)]],
   });
@@ -460,5 +553,37 @@ export class WorldsPageComponent {
 
   openWorld(worldId: number): void {
     void this.router.navigate(['/mundos', worldId]);
+  }
+
+  confirmDeleteWorld(event: MouseEvent, worldId: number): void {
+    event.stopPropagation();
+    event.preventDefault();
+    this.worldToDeleteId.set(worldId);
+  }
+
+  cancelDeleteWorld(): void {
+    this.worldToDeleteId.set(null);
+  }
+
+  getWorldName(worldId: number): string {
+    const world = this.worlds().find(w => w.id === worldId);
+    return world?.name ?? '';
+  }
+
+  executeDeleteWorld(): void {
+    const worldId = this.worldToDeleteId();
+    if (worldId === null) return;
+
+    this.deletingWorldId.set(worldId);
+    this.cancelDeleteWorld();
+
+    this.worldsStore.deleteWorld(worldId).subscribe({
+      next: () => {
+        this.deletingWorldId.set(null);
+      },
+      error: () => {
+        this.deletingWorldId.set(null);
+      }
+    });
   }
 }

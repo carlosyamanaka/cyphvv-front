@@ -84,6 +84,7 @@ Aplicacao Angular para worldbuilding com autenticacao via Firebase Auth (Google)
 - Manter estados de foco visivel em elementos interativos.
 - Priorizar responsividade mobile-first.
 - Evitar estilos globais excessivos; preferir estilos locais no componente.
+- **Efeitos de Hover**: Ao fazer hover em botões ou elementos interativos, altere apenas cores (fundo, texto, borda). **Não aplique efeitos de elevação ou escala** (como `transform: scale()`, `transform: translateY()`, etc.).
 
 ## Observacoes para IA
 
@@ -92,3 +93,6 @@ Aplicacao Angular para worldbuilding com autenticacao via Firebase Auth (Google)
 - Se alterar comportamento de rota, atualizar app.routes.ts e validar com build.
 - Ao alterar interceptor HTTP, revisar impacto em Authorization, withCredentials e CORS.
 - Antes de merge, validar: npm audit, build de producao e checklist de seguranca deste documento.
+- **Tratamento de Soft Delete (deleted = true):**
+  - Não filtre registros no frontend baseando-se em atributos como `deleted === true` ao carregar dados da API. Toda filtragem de dados deletados é de responsabilidade da camada de repositório/banco de dados no backend.
+  - No frontend, apenas atualize o array local (ex: `.filter(item => item.id !== deletedId)`) de forma síncrona/otimista ao finalizar a requisição de exclusão (`DELETE`) para refletir a remoção imediatamente na UI.

@@ -12,7 +12,7 @@ import { AuthService } from '../../../core/services/auth.service';
       <div class="auth-card">
         <h1>Entrar</h1>
         <p class="subtitle">
-          Acesse seu universo e continue construindo mundos, faccoes e lore.
+          Acesse seu universo e continue construindo mundos, npcs e lore.
         </p>
 
         <app-google-auth-button

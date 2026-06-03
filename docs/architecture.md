@@ -217,6 +217,14 @@ Todos prefixados por `environment.apiUrl`:
 
 ---
 
+## Padrão de Soft Delete (Itens Deletados)
+
+- **Filtragem no Backend (Banco de Dados):** O banco de dados e as consultas JPA são responsáveis por filtrar registros onde `deleted = false` (ex: `findByUserIdAndNotDeleted`), garantindo que dados inativos não sejam transmitidos.
+- **Frontend Confia no Backend:** As listas recebidas da API (`/worlds`, `/worlds/:id/cards`, etc.) já vêm filtradas. O frontend não realiza filtragem local de `deleted === true` no carregamento dos dados.
+- **Sincronização de Estado Local:** Ao excluir um item (chamada `DELETE`), o Store do frontend remove o registro do array local na memória por meio de um filtro simples do ID (ex: `cards.filter(c => c.id !== cardId)`) para atualizar a tela imediatamente, sem a necessidade de recarregar a lista inteira da API.
+
+---
+
 ## Assets Públicos (`/public`)
 
 | Arquivo | Uso |
